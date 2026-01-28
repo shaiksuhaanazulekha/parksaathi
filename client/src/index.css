@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-park-dark: #1e3a8a;
+  /* Deep Blue from logo */
+  --color-park-primary: #10b981;
+  /* Green from logo */
+  --color-park-light: #60a5fa;
+  /* Light Blue */
+  --color-park-accent: #f59e0b;
+  /* Vibrant Orange from logo */
+  --color-park-white: #FFFFFF;
+  --color-park-gray: #F5F5F5;
+
+  --font-inter: "Inter", sans-serif;
+  --font-outfit: "Outfit", sans-serif;
+}
+
+
+@layer base {
+  :root {
+    --bg-main: #ffffff;
+    --text-main: #1a3c18;
+    font-family: var(--font-inter);
+    line-height: 1.5;
+    font-weight: 400;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  :root.dark {
+    --bg-main: #111827;
+    --text-main: #f9fafb;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    margin: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-outfit {
+    font-family: var(--font-outfit);
+  }
+}
+
+@layer components {
+  .glass-morphism {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .button-primary {
+    @apply bg-park-primary hover:bg-park-dark text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg active:scale-95;
+  }
+
+  .button-secondary {
+    @apply bg-white border-2 border-park-primary text-park-primary font-semibold py-3 px-6 rounded-xl transition-all duration-300 active:scale-95;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-park-primary focus:ring-2 focus:ring-park-primary/20 outline-none transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow duration-300;
+  }
+
+  /* Leaflet Premium Styles */
+  .leaflet-popup-content-wrapper {
+    @apply rounded-[24px] shadow-2xl p-0 border border-park-primary/5 overflow-hidden;
+  }
+
+  .leaflet-popup-content {
+    @apply m-0 p-3;
+  }
+
+  .leaflet-popup-tip {
+    @apply bg-white;
+  }
+
+  .custom-map-marker {
+    @apply transition-transform duration-300;
+  }
+
+  .custom-map-marker:hover {
+    @apply scale-110 z-[1000];
+  }
+}

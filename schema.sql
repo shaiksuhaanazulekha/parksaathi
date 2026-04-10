@@ -5,6 +5,7 @@ CREATE TABLE profiles (
   phone TEXT UNIQUE,
   full_name TEXT,
   user_type TEXT CHECK (user_type IN ('driver', 'owner')),
+  is_verified BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -75,3 +76,33 @@ CREATE POLICY "Bookings viewable by driver or owner" ON bookings FOR SELECT USIN
   auth.uid() IN (SELECT owner_id FROM parking_spots WHERE id = spot_id)
 );
 CREATE POLICY "Drivers can create bookings" ON bookings FOR INSERT WITH CHECK (auth.uid() = driver_id);
+-- Create Notifications Table
+CREATE TABLE notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT CHECK (type IN ('Booking', 'Payment', 'Reminder', 'System')),
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for notifications
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
+-- OTP Verifications Table
+CREATE TABLE otp_verifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  phone TEXT NOT NULL,
+  otp TEXT NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  verified BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for faster lookup
+CREATE INDEX idx_otp_phone ON otp_verifications(phone);

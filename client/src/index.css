@@ -19,21 +19,21 @@
 
 @layer base {
   :root {
-    --bg-main: #ffffff;
-    --text-main: #1a3c18;
+    --bg-main: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+    --text-main: #1e293b;
     font-family: var(--font-inter);
     line-height: 1.5;
     font-weight: 400;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   :root.dark {
-    --bg-main: #111827;
+    --bg-main: linear-gradient(135deg, #0f172a 0%, #064e3b 100%);
     --text-main: #f9fafb;
   }
 
   body {
-    background-color: var(--bg-main);
+    background: var(--bg-main);
     color: var(--text-main);
     margin: 0;
     min-height: 100vh;

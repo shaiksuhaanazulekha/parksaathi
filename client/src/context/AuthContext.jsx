@@ -1,84 +1,119 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useEffect, useState, useCallback } from 'react';
+import apiService, { getStoredToken, setStoredToken } from '../services/api';
 
-const AuthContext = createContext({});
-
-// Fake Database for Demo
-const MOCK_USERS = [
-    { id: '1', email: 'driver@example.com', password: 'password', full_name: 'Rahul Driver', user_type: 'driver', phone: '9876543210' },
-    { id: '2', email: 'owner@example.com', password: 'password', full_name: 'Amit Owner', user_type: 'owner', phone: '9123456789' }
-];
+export const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [user, setUser]       = useState(null);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // ── Bootstrap: restore session on refresh ─────────────────────────
     useEffect(() => {
-        // Check local storage for persistent session simulation
-        const savedUser = localStorage.getItem('parksaathi_session');
-        if (savedUser) {
-            const parsed = JSON.parse(savedUser);
-            setUser(parsed);
-            setProfile(parsed);
-        }
-        setLoading(false);
+        const restore = async () => {
+            // 1. Demo session
+            const demoRaw = localStorage.getItem('demo_session');
+            if (demoRaw) {
+                try {
+                    const s = JSON.parse(demoRaw);
+                    setUser(s.user);
+                    setProfile(s.profile);
+                    setLoading(false);
+                    return;
+                } catch { localStorage.removeItem('demo_session'); }
+            }
+
+            // 2. Real JWT
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                try {
+                    const { data } = await apiService.getProfile();
+                    setUser({ uid: data.profile.id, email: data.profile.email });
+                    setProfile(data.profile);
+                } catch {
+                    setStoredToken(null); // token expired / invalid
+                }
+            }
+            setLoading(false);
+        };
+        restore();
     }, []);
 
-    const login = async (email, password) => {
-        setLoading(true);
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
-                if (foundUser) {
-                    setUser(foundUser);
-                    setProfile(foundUser);
-                    localStorage.setItem('parksaathi_session', JSON.stringify(foundUser));
-                    resolve(foundUser);
-                } else {
-                    // Allow dynamic login for any new user in "Fake Auth" mode
-                    const newUser = { id: Date.now().toString(), email, full_name: email.split('@')[0], user_type: 'driver' };
-                    setUser(newUser);
-                    setProfile(newUser);
-                    localStorage.setItem('parksaathi_session', JSON.stringify(newUser));
-                    resolve(newUser);
-                }
-                setLoading(false);
-            }, 1000);
-        });
-    };
+    // ── Login ──────────────────────────────────────────────────────────
+    const login = useCallback(async (email, password) => {
+        // Demo shortcuts
+        const DEMOS = {
+            'driver@demo.com': { uid: 'demo-driver-id', role: 'Driver', name: 'Rahul (Demo Driver)', phone: '9876543210' },
+            'owner@demo.com':  { uid: 'demo-owner-id',  role: 'Owner',  name: 'Priya (Demo Owner)',  phone: '9123456780' },
+        };
+        if (DEMOS[email] && password === 'demo123') {
+            const d = DEMOS[email];
+            const demoUser    = { uid: d.uid, email };
+            const demoProfile = { id: d.uid, email, fullName: d.name, role: d.role, phone: d.phone };
+            setUser(demoUser);
+            setProfile(demoProfile);
+            localStorage.setItem('demo_session', JSON.stringify({ user: demoUser, profile: demoProfile }));
+            return { user: demoUser, profile: demoProfile };
+        }
 
-    const signup = async (data) => {
-        setLoading(true);
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const newUser = { ...data, id: Date.now().toString() };
-                setUser(newUser);
-                setProfile(newUser);
-                localStorage.setItem('parksaathi_session', JSON.stringify(newUser));
-                setLoading(false);
-                resolve(newUser);
-            }, 1500);
-        });
-    };
+        // Real backend login
+        const { data } = await apiService.login(email, password);
+        setStoredToken(data.token);
+        setUser({ uid: data.profile.id, email: data.profile.email });
+        setProfile(data.profile);
+        return data;
+    }, []);
 
-    const signOut = () => {
+    // ── Signup ─────────────────────────────────────────────────────────
+    const signup = useCallback(async ({ email, password, fullName, role, phone }) => {
+        const { data } = await apiService.signup({ email, password, fullName, role, phone });
+        setStoredToken(data.token);
+        setUser({ uid: data.profile.id, email: data.profile.email });
+        setProfile(data.profile);
+        return data;
+    }, []);
+
+    // ── Sign Out ───────────────────────────────────────────────────────
+    const signOut = useCallback(async () => {
+        setStoredToken(null);
+        localStorage.removeItem('demo_session');
+        localStorage.removeItem('parksaathi_session');
         setUser(null);
         setProfile(null);
-        localStorage.removeItem('parksaathi_session');
-    };
+    }, []);
 
-    const updateProfile = async (updates) => {
-        const newProfile = { ...profile, ...updates };
-        setProfile(newProfile);
-        setUser(newProfile);
-        localStorage.setItem('parksaathi_session', JSON.stringify(newProfile));
-    };
+    // ── Update Profile ─────────────────────────────────────────────────
+    const updateProfile = useCallback(async (updates) => {
+        const id = user?.uid || profile?.id;
+        if (!id) return;
+        try {
+            const { data } = await apiService.updateProfile(id, updates);
+            setProfile(data);
+        } catch (err) {
+            console.error('Failed to update profile:', err.message);
+        }
+    }, [user, profile]);
+
+    // ── Refresh profile from server ────────────────────────────────────
+    const refreshProfile = useCallback(async () => {
+        if (!getStoredToken()) return;
+        try {
+            const { data } = await apiService.getProfile();
+            setProfile(data.profile);
+        } catch { /* silent */ }
+    }, []);
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, login, signup, signOut, updateProfile }}>
+        <AuthContext.Provider value={{
+            user, profile, loading,
+            login, signup, signOut, updateProfile, refreshProfile,
+            // Legacy aliases kept for backward-compat with existing pages
+            loginWithPhone: () => Promise.resolve(),
+            sendOtp:        () => Promise.resolve(),
+            verifyOtp:      () => Promise.resolve(),
+        }}>
             {children}
         </AuthContext.Provider>
     );
 };
-
-export const useAuth = () => useContext(AuthContext);

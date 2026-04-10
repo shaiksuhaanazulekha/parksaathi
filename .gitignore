@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Local env files
+.env
+client/.env
+server/.env
+
+# DB and lock files
+server/db.json
+package-lock.json
+client/package-lock.json
+server/package-lock.json
+server/serviceAccountKey.json
+
+# Builds
+dist/
+build/
+client/dist/
+
+# OS files
+.DS_Store
+Thumbs.db

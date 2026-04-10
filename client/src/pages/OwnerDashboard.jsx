@@ -1,24 +1,47 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, IndianRupee, Eye, CalendarCheck, TrendingUp, Users, ArrowUpRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { PlusCircle, IndianRupee, Eye, CalendarCheck, TrendingUp, Users, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { MockDB } from '../services/MockDB';
-import { useAuth } from '../context/AuthContext';
+import apiService from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const OwnerDashboard = () => {
     const navigate = useNavigate();
     const { profile } = useAuth();
     const [dbStats, setDbStats] = useState({ totalEarnings: 0, activeBookings: 0, spotViews: 0 });
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [bookingRequests, setBookingRequests] = useState([]);
+
+    const fetchData = useCallback(async () => {
+        if (profile?.id) {
+            try {
+                const [statsRes, historyRes, bookingsRes] = await Promise.all([
+                    apiService.getOwnerStats(profile.id),
+                    apiService.getOwnerHistory(profile.id),
+                    apiService.getOwnerBookings(profile.id)
+                ]);
+                setDbStats(statsRes.data);
+                setRecentActivity(historyRes.data.slice(0, 5));
+                setBookingRequests(bookingsRes.data.filter(b => b.status === 'Pending'));
+            } catch (error) {
+                console.error("Failed to fetch dashboard data", error);
+            }
+        }
+    }, [profile]);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            if (profile?.id) {
-                const stats = await MockDB.getOwnerStats(profile.id);
-                setDbStats(stats);
-            }
-        };
-        fetchStats();
-    }, [profile]);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchData();
+    }, [fetchData]);
+
+    const handleStatusUpdate = async (bookingId, newStatus) => {
+        try {
+            await apiService.updateBookingStatus(bookingId, newStatus);
+            fetchData(); // Refresh all data
+        } catch (error) {
+            alert("Failed to update status: " + error.message);
+        }
+    };
 
     const stats = [
         { name: 'Total Earnings', value: `₹${dbStats.totalEarnings}`, icon: IndianRupee, color: 'text-green-600', bg: 'bg-green-50', trend: '+12%' },
@@ -37,9 +60,14 @@ const OwnerDashboard = () => {
         <div className="min-h-screen bg-gray-50 pb-24">
             <div className="bg-white px-6 pt-16 pb-8 border-b border-gray-100 rounded-b-[40px] shadow-sm">
                 <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-park-dark font-outfit">Host Panel</h1>
-                        <p className="text-gray-400 text-sm font-medium">Manage your parking business</p>
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white p-2 text-white rounded-xl shadow-sm border border-gray-100">
+                             <img src="/logo.png" alt="logo" className="w-8 h-8 object-contain" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold text-park-dark font-outfit">Host Panel</h1>
+                            <p className="text-gray-400 text-sm font-medium">Manage your parking business</p>
+                        </div>
                     </div>
                     <div className="bg-park-primary/10 p-3 rounded-2xl">
                         <TrendingUp size={24} className="text-park-primary" />
@@ -106,24 +134,71 @@ const OwnerDashboard = () => {
                     </div>
                 </div>
 
+                {bookingRequests.length > 0 && (
+                    <div className="bg-white rounded-3xl p-6 border border-park-primary/20 shadow-xl shadow-park-primary/5">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-park-dark flex items-center gap-2">
+                                <span className="w-2 h-2 bg-park-primary rounded-full animate-pulse"></span>
+                                Pending Requests
+                            </h3>
+                            <span className="bg-park-primary/10 text-park-primary text-[10px] font-bold px-2 py-1 rounded-lg">
+                                {bookingRequests.length} NEW
+                            </span>
+                        </div>
+                        <div className="space-y-4">
+                            {bookingRequests.map((request) => (
+                                <div key={request.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                        <p className="text-sm font-bold text-park-dark">{request.profiles?.fullName || request.driverName}</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">{request.parking_spots?.name || request.spotName}</p>
+                                        </div>
+                                        <p className="text-sm font-bold text-park-primary">₹{request.totalPrice || request.total_price}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleStatusUpdate(request.id, 'Confirmed')}
+                                            className="flex-1 py-2 bg-park-primary text-white text-[10px] font-bold rounded-lg"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            onClick={() => handleStatusUpdate(request.id, 'Cancelled')}
+                                            className="flex-1 py-2 bg-white text-gray-400 text-[10px] font-bold rounded-lg border border-gray-100"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-park-dark">Recent Activity</h3>
                         <button className="text-xs font-bold text-park-primary">View All</button>
                     </div>
                     <div className="space-y-4">
-                        {[1, 2].map((i) => (
-                            <div key={i} className="flex items-center gap-4 group">
+                        {recentActivity.length > 0 ? recentActivity.map((activity) => (
+                            <div key={activity.id} className="flex items-center gap-4 group">
                                 <div className="w-12 h-12 bg-park-gray rounded-xl flex items-center justify-center text-park-primary transition-colors group-hover:bg-park-primary group-hover:text-white">
                                     <Users size={20} />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-sm font-bold text-park-dark">Booking Confirmed</p>
-                                    <p className="text-xs text-gray-400 font-medium">Ashok Villa • 2 hours ago</p>
+                                    <p className="text-sm font-bold text-park-dark">Earning Processed</p>
+                                    <p className="text-xs text-gray-400 font-medium">
+                                        {activity.spotName || activity.parking_spots?.name || 'Spot'} • {new Date(activity.createdAt || activity.created_at).toLocaleDateString()}
+                                    </p>
                                 </div>
-                                <p className="text-sm font-bold text-green-600">+₹150</p>
+                                <p className="text-sm font-bold text-green-600">+₹{activity.totalPrice || activity.amount}</p>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="text-center py-6">
+                                <p className="text-xs text-gray-400 italic">No recent activity yet.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

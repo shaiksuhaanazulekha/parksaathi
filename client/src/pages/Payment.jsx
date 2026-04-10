@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, IndianRupee, ShieldCheck, CheckCircle2, CreditCard, Wallet, Smartphone, Landmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MockDB } from '../services/MockDB';
-import { useAuth } from '../context/AuthContext';
+import apiService from '../services/api';
+
 
 const Payment = () => {
     const navigate = useNavigate();
     const { state } = useLocation();
-    const { profile } = useAuth();
+
+    const [transactionId] = useState(() => `PS_${Math.floor(Math.random() * 900000000) + 100000000}`);
     const [selectedMode, setSelectedMode] = useState('UPI');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -23,29 +24,31 @@ const Payment = () => {
         { id: 'NetBanking', name: 'Net Banking', icon: Landmark, color: 'text-gray-600', bg: 'bg-gray-50' },
     ];
 
-    const handlePayment = async () => {
+    const handlePayment = async (status = 'Success') => {
         setIsProcessing(true);
 
         try {
-            // Save to MockDB (Simulated MongoDB/Vector DB)
-            await MockDB.createBooking({
-                spot_id: bookingData?.id || '1',
-                driver_id: profile?.id || 'guest',
+            // Simulate payment processing time
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            await apiService.createPayment({
+                booking_id: bookingData?.id,
                 amount: amount,
                 mode: selectedMode,
-                start_time: bookingData?.startTime,
-                end_time: bookingData?.endTime,
+                transaction_id: status === 'Success' ? transactionId : null,
+                status: status
             });
 
-            setTimeout(() => {
-                setIsProcessing(false);
+            setIsProcessing(false);
+            if (status === 'Success') {
                 setIsSuccess(true);
-                setTimeout(() => {
-                    navigate('/bookings');
-                }, 3000);
-            }, 1500);
+            } else {
+                alert("Payment Failed! Your booking request has been cancelled.");
+                navigate('/bookings');
+            }
         } catch (e) {
-            alert("Payment simulation failed");
+            console.error("Payment failed", e);
+            alert("Payment failed: " + e.message);
             setIsProcessing(false);
         }
     };
@@ -67,7 +70,7 @@ const Payment = () => {
                     <div className="bg-park-gray w-full p-6 rounded-3xl mb-8 flex justify-between items-center border border-gray-100">
                         <div className="text-left">
                             <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Transaction ID</p>
-                            <p className="font-bold text-park-dark">PS_{Math.floor(Math.random() * 900000000) + 100000000}</p>
+                            <p className="font-bold text-park-dark">{transactionId}</p>
                         </div>
                         <div className="text-right">
                             <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Amount</p>
@@ -119,8 +122,8 @@ const Payment = () => {
                             disabled={isProcessing}
                             onClick={() => setSelectedMode(mode.id)}
                             className={`w-full p-5 rounded-3xl flex items-center justify-between transition-all border-2 ${selectedMode === mode.id
-                                    ? 'border-park-primary bg-white shadow-lg scale-[1.02]'
-                                    : 'border-transparent bg-white shadow-sm'
+                                ? 'border-park-primary bg-white shadow-lg scale-[1.02]'
+                                : 'border-transparent bg-white shadow-sm'
                                 }`}
                         >
                             <div className="flex items-center gap-4">
@@ -138,7 +141,7 @@ const Payment = () => {
                 </div>
 
                 <button
-                    onClick={handlePayment}
+                    onClick={() => handlePayment('Success')}
                     disabled={isProcessing}
                     className="w-full button-primary py-5 text-lg flex items-center justify-center gap-3 shadow-2xl shadow-park-primary/30"
                 >
@@ -154,6 +157,14 @@ const Payment = () => {
                     ) : (
                         <>Proceed to Pay ₹{amount}</>
                     )}
+                </button>
+
+                <button
+                    onClick={() => handlePayment('Failed')}
+                    disabled={isProcessing}
+                    className="w-full mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-red-500 transition-colors"
+                >
+                    Simulate Payment Failure
                 </button>
             </div>
         </div>

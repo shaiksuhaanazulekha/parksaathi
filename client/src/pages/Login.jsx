@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { LogIn, Phone, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,7 +17,7 @@ const Login = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
-    const { login } = useAuth();
+    const { login, loginWithPhone, verifyOtp } = useAuth();
 
     const handleEmailLogin = async (e) => {
         e.preventDefault();
@@ -35,24 +35,32 @@ const Login = () => {
     };
 
 
-    const handleSendOtp = (e) => {
+    const handleSendOtp = async (e) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate OTP sending
-        setTimeout(() => {
+        setError(null);
+        try {
+            await loginWithPhone(phone);
             setIsOtpSent(true);
+        } catch (err) {
+            setError(err.message);
+        } finally {
             setLoading(false);
-        }, 1500);
+        }
     };
 
-    const handleVerifyOtp = (e) => {
+    const handleVerifyOtp = async (e) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate verification
-        setTimeout(() => {
+        setError(null);
+        try {
+            await verifyOtp(phone, otp);
             navigate('/dashboard');
+        } catch (err) {
+            setError(err.message);
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
     return (
@@ -218,6 +226,39 @@ const Login = () => {
                         <div className="relative flex justify-center text-xs">
                             <span className="px-4 bg-white text-gray-400 font-bold uppercase tracking-widest">Or continue with</span>
                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-8">
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                setLoading(true);
+                                try {
+                                    await login('driver@demo.com', 'demo123');
+                                    navigate('/dashboard');
+                                } catch (e) { setError(e.message); }
+                                finally { setLoading(false); }
+                            }}
+                            className="bg-white border border-gray-100 py-4 rounded-2xl flex flex-col items-center justify-center gap-1 hover:bg-park-primary hover:text-white hover:border-park-primary transition-all shadow-sm group"
+                        >
+                            <span className="font-bold text-sm">Demo Driver</span>
+                            <span className="text-[10px] opacity-50 font-medium text-gray-400 group-hover:text-white/70">One-Tap Login</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                setLoading(true);
+                                try {
+                                    await login('owner@demo.com', 'demo123');
+                                    navigate('/dashboard');
+                                } catch (e) { setError(e.message); }
+                                finally { setLoading(false); }
+                            }}
+                            className="bg-white border border-gray-100 py-4 rounded-2xl flex flex-col items-center justify-center gap-1 hover:bg-park-accent hover:text-white hover:border-park-accent transition-all shadow-sm group"
+                        >
+                            <span className="font-bold text-sm">Demo Owner</span>
+                            <span className="text-[10px] opacity-50 font-medium text-gray-400 group-hover:text-white/70">One-Tap Login</span>
+                        </button>
                     </div>
 
                     <div className="mt-8">

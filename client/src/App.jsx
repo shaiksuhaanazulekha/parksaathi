@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Home from './pages/Home';
@@ -22,7 +23,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
 
-  if (allowedRoles && !allowedRoles.includes(profile?.user_type)) {
+  const userRole = (profile?.role || profile?.user_type || '').toLowerCase();
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
     return <Navigate to="/dashboard" />;
   }
 
@@ -44,7 +46,7 @@ function AppRoutes() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              {profile?.user_type === 'owner' ? <OwnerDashboard /> : <Home />}
+              {(profile?.role || profile?.user_type || '').toLowerCase() === 'owner' ? <OwnerDashboard /> : <Home />}
             </ProtectedRoute>
           }
         />

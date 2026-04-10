@@ -90,6 +90,11 @@ export const MockDB = {
         return spots.slice(0, 300); // Return top 300 nearest for performance
     },
 
+    getSpotById: async (id) => {
+        const spots = JSON.parse(localStorage.getItem(STORAGE_KEY_SPOTS)) || DEFAULT_SPOTS;
+        return spots.find(s => s.id === id);
+    },
+
     addSpot: async (spotData) => {
         const spots = JSON.parse(localStorage.getItem(STORAGE_KEY_SPOTS)) || DEFAULT_SPOTS;
         const newSpot = { ...spotData, id: Date.now().toString(), rating: '5.0' };
@@ -113,7 +118,7 @@ export const MockDB = {
         return newBooking;
     },
 
-    getOwnerStats: async (ownerId) => {
+    getOwnerStats: async () => {
         const allBookings = JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKINGS)) || [];
         // Mock stats for demo
         return {

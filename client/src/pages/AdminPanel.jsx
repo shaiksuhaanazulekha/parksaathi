@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Users, MapPin, Calendar, CreditCard, ShieldCheck, ChevronRight, Search } from 'lucide-react';
-import { motion } from 'framer-motion';
+
 
 const AdminPanel = () => {
     const [activeTab, setActiveTab] = useState('users');

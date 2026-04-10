@@ -1,0 +1,28 @@
+run = "npm start"
+entrypoint = "index.js"
+hidden = ["node_modules", "db.json"]
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+
+[nix]
+channel = "stable-23_11"
+
+[env]
+PORT = "3000"
+JWT_SECRET = "parksaathi_secret_replit_2024"
+
+[languages.javascript]
+pattern = "**/{*.js}"
+syntax = "javascript"
+
+[languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
+
+[[ports]]
+localPort = 3000
+externalPort = 80

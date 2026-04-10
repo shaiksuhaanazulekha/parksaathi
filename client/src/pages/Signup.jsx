@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { UserPlus, Car, Home as House, ArrowRight, User, Phone, Mail, Lock } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,7 +16,10 @@ const Signup = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
-    const { signup } = useAuth();
+    const [otp, setOtp] = useState('');
+    const [verifying, setVerifying] = useState(false);
+
+    const { signup, verifyOtp } = useAuth();
 
     const handleSignup = async (e) => {
         e.preventDefault();
@@ -31,11 +34,29 @@ const Signup = () => {
                 user_type: role,
                 password
             });
-            navigate('/dashboard');
+            // On success, backend sends OTP and we move to OTP step
+            setStep(3);
         } catch (err) {
-            setError(err.message);
+            setError(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setVerifying(true);
+        setError(null);
+
+        try {
+            await verifyOtp(phone, otp);
+            // After phone verification, we inform them to check email too, but for MVP we can navigate
+            alert("Phone Verified! Please also verify your email via the link sent to you.");
+            navigate('/dashboard');
+        } catch (err) {
+            setError(err);
+        } finally {
+            setVerifying(false);
         }
     };
 
@@ -97,7 +118,7 @@ const Signup = () => {
                                 <Link to="/login" className="text-park-primary font-bold">Log in</Link>
                             </p>
                         </motion.div>
-                    ) : (
+                    ) : step === 2 ? (
                         <motion.div
                             key="step2"
                             initial={{ opacity: 0, x: 50 }}
@@ -198,6 +219,56 @@ const Signup = () => {
                                         )}
                                     </button>
                                 </div>
+                            </form>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="step3"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-white p-8 rounded-[2.5rem] shadow-2xl space-y-8"
+                        >
+                            <div className="text-center">
+                                <div className="w-20 h-20 bg-park-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                    <Phone className="text-park-primary w-10 h-10" />
+                                </div>
+                                <h2 className="text-3xl font-black text-park-dark mb-2">Verify Phone</h2>
+                                <p className="text-gray-400 text-sm px-4">
+                                    We've sent a 6-digit code to <span className="font-bold text-park-dark">{phone}</span>
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleVerifyOtp} className="space-y-6">
+                                <div>
+                                    <input
+                                        type="text"
+                                        maxLength="6"
+                                        placeholder="000000"
+                                        className="w-full text-center text-4xl font-black tracking-[1rem] py-6 rounded-3xl border-2 border-gray-100 focus:border-park-primary focus:ring-4 focus:ring-park-primary/10 outline-none transition-all placeholder:text-gray-100"
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value)}
+                                        required
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="bg-red-50 text-red-500 p-4 rounded-2xl flex items-center gap-3 text-sm font-bold">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                        {error}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={verifying}
+                                    className="w-full button-primary py-5 rounded-3xl shadow-xl shadow-park-primary/30 flex items-center justify-center gap-3"
+                                >
+                                    {verifying ? (
+                                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>Complete Verification <ArrowRight size={20} /></>
+                                    )}
+                                </button>
                             </form>
                         </motion.div>
                     )}

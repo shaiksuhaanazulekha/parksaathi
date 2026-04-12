@@ -1,261 +1,202 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, SlidersHorizontal, MapPin, Navigation, List, Map, Star, Loader2 } from 'lucide-react';
-import MapView from '../components/MapView';
+import { Search, Map as MapIcon, List, Filter, MapPin, Star, Clock, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiService from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-
-const FALLBACK_IMG = 'https://images.unsplash.com/photo-1590674899484-13da0d1b58f5?w=400&auto=format';
+import MapView from '../components/MapView';
 
 const Home = () => {
-    const navigate = useNavigate();
-    const { profile } = useAuth();
-    const [searchQuery, setSearchQuery]   = useState('');
-    const [viewMode, setViewMode]         = useState('map');
-    const [showFilters, setShowFilters]   = useState(false);
-    const [priceRange, setPriceRange]     = useState(500);
-    const [spots, setSpots]               = useState([]);
-    const [loading, setLoading]           = useState(true);
-    const [coords, setCoords]             = useState({ lat: 17.4483, lng: 78.3915 });
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [spots, setSpots] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [cityData, setCityData] = useState(null);
+  
+  const userCity = localStorage.getItem('user_city') || profile?.location?.city;
+  const userArea = localStorage.getItem('user_area') || profile?.location?.area;
 
-    useEffect(() => {
-        navigator.geolocation?.getCurrentPosition(
-            (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => {}
-        );
-    }, []);
+  useEffect(() => {
+    if (!userCity || !userArea) {
+      navigate('/location-picker');
+      return;
+    }
 
-    const fetchSpots = useCallback(async () => {
-        setLoading(true);
-        try {
-            const { data } = await apiService.getSpots({ query: searchQuery, lat: coords.lat, lng: coords.lng });
-            const filtered = (data || []).filter(s => (s.pricePerHour || s.hourly_rate || 0) <= priceRange);
-            setSpots(filtered);
-        } catch {
-            setSpots([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [searchQuery, coords, priceRange]);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [spotsRes, cityRes] = await Promise.all([
+          apiService.getSpots({ city: userCity, area: userArea }),
+          apiService.getPricing(userCity, userArea)
+        ]);
+        setSpots(spotsRes.data);
+        setCityData(cityRes.data);
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    };
+    loadData();
+  }, [userCity, userArea, navigate]);
 
-    useEffect(() => {
-        const timer = setTimeout(fetchSpots, 300);
-        return () => clearTimeout(timer);
-    }, [fetchSpots]);
+  const now = new Date();
+  const hour = now.getHours();
+  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  const isSurge = (hour >= 8 && hour < 10) || (hour >= 17 && hour < 20) || isWeekend;
 
-    const handleSpotSelect = (spot) => navigate(`/book/${spot.id || spot._id}`);
+  const getBadge = (price) => {
+    if (!cityData) return null;
+    if (price < cityData.avg) return <span className="bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase">💰 Below Average</span>;
+    if (price === cityData.avg) return <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase">✓ Fair Price</span>;
+    return <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase">⚡ Premium</span>;
+  };
 
-    return (
-        <div className="h-screen flex flex-col relative overflow-hidden bg-gray-50">
-            {/* Header overlay */}
-            <div className="absolute top-0 left-0 right-0 z-[500] p-4 pointer-events-none">
-                <div className="max-w-lg mx-auto space-y-3 pointer-events-auto">
-                    {/* Search bar */}
-                    <div className="flex items-center gap-2 bg-white/96 backdrop-blur-xl rounded-2xl p-2 shadow-2xl border border-white/60">
-                        <div className="p-2 border-r border-gray-100 shrink-0">
-                            <img src="/logo.png" alt="logo" className="w-6 h-6 object-contain" />
-                        </div>
-                        <Search size={18} className="text-park-primary shrink-0 ml-1" />
-                        <input
-                            type="text"
-                            placeholder="Search parking in Hyderabad..."
-                            className="flex-1 bg-transparent outline-none text-sm font-semibold text-park-dark placeholder:text-gray-400 min-w-0"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        <button
-                            onClick={() => setShowFilters(v => !v)}
-                            className={`p-2 rounded-xl transition-all shrink-0 ${showFilters ? 'bg-park-primary text-white' : 'text-gray-400 hover:text-park-primary'}`}
-                        >
-                            <SlidersHorizontal size={20} />
-                        </button>
-                    </div>
+  const calculateDisplayPrice = (base) => {
+    let p = base;
+    if ((hour >= 8 && hour < 10) || (hour >= 17 && hour < 20)) p *= 1.3;
+    else if (isWeekend) p *= 1.2;
+    return Math.round(p);
+  };
 
-                    {/* Filters panel */}
-                    <AnimatePresence>
-                        {showFilters && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0, y: -10 }}
-                                animate={{ height: 'auto', opacity: 1, y: 0 }}
-                                exit={{ height: 0, opacity: 0, y: -10 }}
-                                className="bg-white/96 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60 overflow-hidden"
-                            >
-                                <div className="p-5 space-y-5">
-                                    <div className="flex justify-between items-center">
-                                        <h3 className="font-bold text-park-dark">Filters</h3>
-                                        <button
-                                            onClick={() => { setPriceRange(500); setShowFilters(false); }}
-                                            className="text-xs font-bold text-park-primary"
-                                        >
-                                            Reset
-                                        </button>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between mb-2">
-                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Max Price</label>
-                                            <span className="text-xs font-bold text-park-primary">₹{priceRange}/hr</span>
-                                        </div>
-                                        <input
-                                            type="range" min="20" max="500" step="10"
-                                            value={priceRange}
-                                            onChange={(e) => setPriceRange(parseInt(e.target.value))}
-                                            className="w-full accent-park-primary h-2"
-                                        />
-                                        <div className="flex justify-between mt-1">
-                                            <span className="text-[10px] text-gray-400">₹20</span>
-                                            <span className="text-[10px] text-gray-400">₹500</span>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowFilters(false)}
-                                        className="w-full py-3 bg-park-primary text-white text-sm font-bold rounded-xl"
-                                    >
-                                        Apply Filters ({spots.length} results)
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Map / List toggle */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setViewMode('map')}
-                            className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg ${
-                                viewMode === 'map' ? 'bg-park-primary text-white shadow-park-primary/30' : 'bg-white/90 backdrop-blur-sm text-park-dark'
-                            }`}
-                        >
-                            <Map size={15} /> Map
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg ${
-                                viewMode === 'list' ? 'bg-park-primary text-white shadow-park-primary/30' : 'bg-white/90 backdrop-blur-sm text-park-dark'
-                            }`}
-                        >
-                            <List size={15} /> List
-                        </button>
-                    </div>
-                </div>
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Header */}
+      <div className="bg-white px-5 pt-12 pb-6 border-b border-gray-100 sticky top-0 z-50 rounded-b-[32px] shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <button onClick={() => navigate('/location-picker')} className="flex items-center gap-2 group">
+            <div className="bg-park-primary/10 p-2 rounded-xl text-park-primary group-hover:bg-park-primary group-hover:text-white transition-colors">
+              <MapPin size={20} />
             </div>
-
-            {/* Main content */}
-            <div className="flex-1 w-full relative">
-                {viewMode === 'map' ? (
-                    <div className="absolute inset-0">
-                        <MapView onSpotSelect={handleSpotSelect} />
-                    </div>
-                ) : (
-                    <div className="h-full pt-44 px-4 pb-24 overflow-y-auto">
-                        {loading ? (
-                            <div className="flex items-center justify-center py-20">
-                                <Loader2 className="animate-spin text-park-primary" size={32} />
-                            </div>
-                        ) : spots.length > 0 ? (
-                            <div className="max-w-lg mx-auto space-y-4">
-                                {spots.map((spot, i) => (
-                                    <motion.div
-                                        key={spot.id || spot._id}
-                                        initial={{ opacity: 0, y: 16 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: i * 0.05 }}
-                                        onClick={() => handleSpotSelect(spot)}
-                                        className="bg-white rounded-3xl shadow-sm border border-gray-100 flex gap-4 p-4 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
-                                    >
-                                        <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0">
-                                            <img
-                                                src={spot.photos?.[0] || FALLBACK_IMG}
-                                                alt={spot.name}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => { e.target.src = FALLBACK_IMG; }}
-                                            />
-                                        </div>
-                                        <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                                            <div>
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <h3 className="font-bold text-park-dark text-sm leading-tight truncate">{spot.name}</h3>
-                                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600 shrink-0">
-                                                        Available
-                                                    </span>
-                                                </div>
-                                                <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1 mt-1 truncate">
-                                                    <MapPin size={10} className="text-park-primary shrink-0" />
-                                                    {spot.address}
-                                                </p>
-                                                <div className="flex items-center gap-1 mt-1.5">
-                                                    <Star size={11} className="text-yellow-400 fill-yellow-400" />
-                                                    <span className="text-[11px] font-bold text-gray-600">{spot.rating || '4.5'}</span>
-                                                    {spot.distance && (
-                                                        <span className="text-[10px] text-gray-400 ml-1">• {spot.distance.toFixed(1)} km</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-park-primary font-black text-lg leading-none">
-                                                    ₹{spot.pricePerHour || spot.hourly_rate}
-                                                    <span className="text-[10px] text-gray-400 font-bold ml-0.5">/hr</span>
-                                                </span>
-                                                <button className="bg-park-dark text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl">
-                                                    Book
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-24 text-center">
-                                <div className="bg-gray-100 p-8 rounded-full mb-4">
-                                    <Search size={40} className="text-gray-300" />
-                                </div>
-                                <p className="font-bold text-park-dark">No spots found</p>
-                                <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
-                                <button onClick={() => { setSearchQuery(''); setPriceRange(500); }} className="mt-4 text-park-primary text-sm font-bold">
-                                    Clear Filters
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
+            <div>
+              <p className="text-[10px] font-black text-gray-400 leading-none uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                Your Location <ChevronRight size={10} />
+              </p>
+              <h2 className="text-base font-black text-park-dark font-outfit truncate max-w-[150px]">
+                {userArea}, {userCity}
+              </h2>
             </div>
-
-            {/* Floating spot card (map mode) */}
-            <AnimatePresence>
-                {viewMode === 'map' && spots.length > 0 && (
-                    <motion.div
-                        initial={{ y: 120, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 120, opacity: 0 }}
-                        transition={{ type: 'spring', damping: 20 }}
-                        onClick={() => handleSpotSelect(spots[0])}
-                        className="absolute bottom-24 left-4 right-4 z-[400] cursor-pointer max-w-lg mx-auto"
-                    >
-                        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 flex items-center gap-4 px-5 py-4">
-                            <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 bg-gray-100">
-                                <img
-                                    src={spots[0].photos?.[0] || FALLBACK_IMG}
-                                    alt={spots[0].name}
-                                    className="w-full h-full object-cover"
-                                    onError={e => { e.target.src = FALLBACK_IMG; }}
-                                />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-black text-park-dark text-sm truncate">{spots[0].name}</h4>
-                                <p className="text-[10px] text-gray-400 font-medium truncate mt-0.5">{spots[0].address}</p>
-                                <p className="text-park-primary font-black text-sm mt-0.5">
-                                    ₹{spots[0].pricePerHour || spots[0].hourly_rate}/hr
-                                </p>
-                            </div>
-                            <button className="bg-park-primary text-white p-3.5 rounded-2xl shadow-lg shadow-park-primary/30 shrink-0">
-                                <Navigation size={20} fill="currentColor" />
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+          </button>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+              className="p-3 bg-park-gray rounded-2xl text-park-primary hover:bg-park-primary hover:text-white transition-all shadow-sm"
+            >
+              {viewMode === 'list' ? <MapIcon size={22} /> : <List size={22} />}
+            </button>
+          </div>
         </div>
-    );
+
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-park-primary transition-colors" size={20} />
+          <input 
+            type="text" 
+            placeholder="Search nearby parking..." 
+            className="w-full bg-park-gray/50 border-none rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-park-primary transition-all font-medium text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-5 space-y-4">
+          {[1,2,3].map(i => <div key={i} className="h-64 bg-gray-100 rounded-[32px] animate-pulse" />)}
+        </div>
+      ) : (
+        <div className="p-5">
+          {viewMode === 'list' ? (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center mb-2 px-2">
+                <div>
+                  <h3 className="text-lg font-black text-park-dark font-outfit">Available Spots</h3>
+                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Area avg: ₹{cityData?.avg}/hr</p>
+                </div>
+                {isSurge && (
+                  <div className="flex items-center gap-1.5 bg-orange-50 text-orange-600 px-3 py-1.5 rounded-full border border-orange-100">
+                    <Zap size={14} fill="currentColor" />
+                    <span className="text-[10px] font-black uppercase tracking-tight">Peak Surge Active</span>
+                  </div>
+                )}
+              </div>
+
+              {spots.map((spot) => (
+                <motion.div 
+                  key={spot.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => navigate(`/booking/${spot.id}`)}
+                  className="bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-50 flex flex-col group cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img 
+                      src={spot.photos?.[0] || spot.image || 'https://images.unsplash.com/photo-1590674899484-13da0d1b58f5?w=400&auto=format'} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                    />
+                    <div className="absolute top-4 left-4 flex gap-2">
+                      <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg border border-white/20">
+                        <Star size={14} className="text-amber-400 fill-amber-400" />
+                        <span className="text-xs font-black text-park-dark">{spot.rating || 'New'}</span>
+                      </div>
+                    </div>
+                    {isSurge && (
+                       <div className="absolute top-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-lg border border-orange-400/30">
+                          <Zap size={14} fill="white" />
+                          <span className="text-[10px] font-black uppercase tracking-tight">Peak +30%</span>
+                       </div>
+                    )}
+                  </div>
+
+                  <div className="p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1 pr-4">
+                        <h3 className="text-lg font-black text-park-dark font-outfit truncate">{spot.name}</h3>
+                        <p className="text-xs text-gray-400 font-medium flex items-center gap-1 mt-0.5">
+                          <MapPin size={12} className="text-park-primary" /> {spot.address}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-park-primary font-outfit">₹{calculateDisplayPrice(spot.pricing?.basePrice || spot.pricePerHour)}<span className="text-xs text-gray-400 font-bold">/hr</span></p>
+                        {getBadge(spot.pricing?.basePrice || spot.pricePerHour)}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-4 border-t border-gray-50">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-park-gray rounded-lg flex items-center justify-center text-park-primary">
+                          <Clock size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">Timing</p>
+                          <p className="text-[11px] font-black text-park-dark uppercase">9AM — 9PM</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-park-gray rounded-lg flex items-center justify-center text-park-primary">
+                          <Zap size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">CCTV</p>
+                          <p className="text-[11px] font-black text-park-dark uppercase">Available</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="fixed inset-0 pt-[180px] pb-20 z-0">
+               <MapView spots={spots} onSelect={(s) => navigate(`/booking/${s.id}`)} userLocation={{ lat: 17.4483, lng: 78.3915 }} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
+
+const ChevronRight = ({ size }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>;
 
 export default Home;

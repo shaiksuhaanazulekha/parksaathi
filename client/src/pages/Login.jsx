@@ -1,273 +1,128 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { LogIn, Phone, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-
+import { LogIn, Eye, EyeOff, ShieldCheck, Zap, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Login = () => {
-    const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone'
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [password, setPassword] = useState('');
-    const [otp, setOtp] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [isOtpSent, setIsOtpSent] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const { login, user } = useAuth();
 
-    const { login, loginWithPhone, verifyOtp } = useAuth();
+    useEffect(() => {
+        if (user) navigate('/dashboard', { replace: true });
+    }, [user, navigate]);
 
-    const handleEmailLogin = async (e) => {
+    const [email, setEmail]             = useState('');
+    const [password, setPassword]       = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading]         = useState(false);
+    const [demoLoading, setDemoLoading] = useState(null);
+    const [error, setError]             = useState('');
+
+    const validate = () => {
+        if (!email) { setError('Email is required'); return false; }
+        if (!/\S+@\S+\.\S+/.test(email)) { setError('Invalid email format'); return false; }
+        if (!password) { setError('Password is required'); return false; }
+        return true;
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
+        if (!validate()) return;
+        
         setLoading(true);
-        setError(null);
-
         try {
-            await login(email, password);
+            await login(email.trim(), password);
             navigate('/dashboard');
         } catch (err) {
-            setError(err.message);
+            setError(err.message || 'Invalid credentials. Try demo login below.');
         } finally {
             setLoading(false);
         }
     };
 
-
-    const handleSendOtp = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
+    const handleDemo = async (role) => {
+        setDemoLoading(role);
+        setError('');
         try {
-            await loginWithPhone(phone);
-            setIsOtpSent(true);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-        try {
-            await verifyOtp(phone, otp);
+            await login(`${role}@demo.com`, 'demo123');
             navigate('/dashboard');
         } catch (err) {
             setError(err.message);
         } finally {
-            setLoading(false);
+            setDemoLoading(null);
         }
     };
 
     return (
-        <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="w-full max-w-md"
-            >
+        <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-16 pb-12 overflow-y-auto">
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
                 <div className="flex flex-col items-center mb-10">
-                    <div className="bg-white p-4 rounded-3xl shadow-xl mb-4 border border-park-primary/5">
-                        <img src="/logo.png" alt="ParkSaathi" className="w-16 h-16 object-contain" />
+                    <div className="bg-white p-5 rounded-[32px] shadow-2xl border border-gray-100 mb-6">
+                        <img src="/logo.png" alt="ParkSaathi" className="w-14 h-14 object-contain" />
                     </div>
-                    <h1 className="text-3xl font-bold text-park-dark font-outfit">Welcome Back</h1>
-                    <p className="text-gray-500 text-sm">Log in to your ParkSaathi account</p>
+                    <h1 className="text-4xl font-black text-park-dark font-outfit tracking-tighter">Login</h1>
+                    <p className="text-gray-400 text-sm font-medium mt-1">Hello again! Welcome back.</p>
                 </div>
 
-                <div className="flex bg-park-gray p-1 rounded-2xl mb-8">
-                    <button
-                        onClick={() => setLoginMethod('email')}
-                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${loginMethod === 'email' ? 'bg-white text-park-dark shadow-sm' : 'text-gray-400'}`}
-                    >
-                        Email
-                    </button>
-                    <button
-                        onClick={() => setLoginMethod('phone')}
-                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${loginMethod === 'phone' ? 'bg-white text-park-dark shadow-sm' : 'text-gray-400'}`}
-                    >
-                        Mobile
-                    </button>
-                </div>
-
-                <AnimatePresence mode="wait">
-                    {loginMethod === 'email' ? (
-                        <motion.form
-                            key="email"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            onSubmit={handleEmailLogin}
-                            className="space-y-5"
-                        >
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Email Address</label>
-                                <input
-                                    type="email"
-                                    placeholder="name@example.com"
-                                    className="input-field"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Password</label>
-                                <div className="relative">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        placeholder="••••••••"
-                                        className="input-field pr-12"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-                                    >
-                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {error && <p className="text-red-500 text-sm text-center font-medium bg-red-50 p-3 rounded-xl">{error}</p>}
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full button-primary flex items-center justify-center gap-2"
-                            >
-                                {loading ? 'Authenticating...' : (
-                                    <>
-                                        <LogIn size={20} />
-                                        Log in to ParkSaathi
-                                    </>
-                                )}
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                        <input
+                            type="email" placeholder="name@email.com"
+                            className={`input-field ${error && email === '' ? 'border-red-500' : ''}`}
+                            value={email} onChange={e => { setEmail(e.target.value); setError(''); }}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Password</label>
+                        <div className="relative">
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder="••••••••"
+                                className={`input-field pr-12 ${error && password === '' ? 'border-red-500' : ''}`}
+                                value={password} onChange={e => { setPassword(e.target.value); setError(''); }}
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300">
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                             </button>
-                        </motion.form>
-                    ) : (
-                        <motion.form
-                            key="phone"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            onSubmit={isOtpSent ? handleVerifyOtp : handleSendOtp}
-                            className="space-y-5"
-                        >
-                            {!isOtpSent ? (
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Mobile Number</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-park-dark">+91</span>
-                                        <input
-                                            type="tel"
-                                            placeholder="98765 43210"
-                                            className="input-field pl-14"
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Enter OTP</label>
-                                    <input
-                                        type="text"
-                                        placeholder="0 0 0 0"
-                                        className="input-field text-center tracking-[1em] text-xl font-bold"
-                                        maxLength={4}
-                                        value={otp}
-                                        onChange={(e) => setOtp(e.target.value)}
-                                        required
-                                    />
-                                    <p className="text-xs text-center text-gray-400 mt-4">
-                                        OTP sent to +91 {phone}. <button type="button" onClick={() => setIsOtpSent(false)} className="text-park-primary font-bold">Change?</button>
-                                    </p>
-                                </motion.div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full button-primary flex items-center justify-center gap-2"
-                            >
-                                {loading ? 'Processing...' : (
-                                    <>
-                                        <ShieldCheck size={20} />
-                                        {isOtpSent ? 'Verify OTP' : 'Get OTP'}
-                                    </>
-                                )}
-                            </button>
-                        </motion.form>
-                    )}
-                </AnimatePresence>
-
-                <div className="mt-8 text-center">
-                    <p className="text-gray-500 font-medium">
-                        Don't have an account?{' '}
-                        <Link to="/signup" className="text-park-primary font-bold hover:underline">
-                            Sign up
-                        </Link>
-                    </p>
-                </div>
-
-                <div className="mt-8">
-                    <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-100"></div>
-                        </div>
-                        <div className="relative flex justify-center text-xs">
-                            <span className="px-4 bg-white text-gray-400 font-bold uppercase tracking-widest">Or continue with</span>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-8">
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                setLoading(true);
-                                try {
-                                    await login('driver@demo.com', 'demo123');
-                                    navigate('/dashboard');
-                                } catch (e) { setError(e.message); }
-                                finally { setLoading(false); }
-                            }}
-                            className="bg-white border border-gray-100 py-4 rounded-2xl flex flex-col items-center justify-center gap-1 hover:bg-park-primary hover:text-white hover:border-park-primary transition-all shadow-sm group"
-                        >
-                            <span className="font-bold text-sm">Demo Driver</span>
-                            <span className="text-[10px] opacity-50 font-medium text-gray-400 group-hover:text-white/70">One-Tap Login</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                setLoading(true);
-                                try {
-                                    await login('owner@demo.com', 'demo123');
-                                    navigate('/dashboard');
-                                } catch (e) { setError(e.message); }
-                                finally { setLoading(false); }
-                            }}
-                            className="bg-white border border-gray-100 py-4 rounded-2xl flex flex-col items-center justify-center gap-1 hover:bg-park-accent hover:text-white hover:border-park-accent transition-all shadow-sm group"
-                        >
-                            <span className="font-bold text-sm">Demo Owner</span>
-                            <span className="text-[10px] opacity-50 font-medium text-gray-400 group-hover:text-white/70">One-Tap Login</span>
-                        </button>
-                    </div>
+                    <AnimatePresence>
+                        {error && (
+                            <motion.div initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold">
+                                <AlertCircle size={18} className="shrink-0" /> {error}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                    <div className="mt-8">
-                        <button className="w-full bg-white border border-gray-100 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/0/google.svg" alt="Google" className="w-5 h-5" />
-                            <span className="font-bold text-park-dark">Google Account</span>
-                        </button>
-                    </div>
+                    <button type="submit" disabled={loading} className="button-primary w-full py-4.5 text-base flex items-center justify-center gap-2 shadow-2xl shadow-park-primary/25 disabled:opacity-50">
+                        {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <LogIn size={20} />}
+                        {loading ? 'Authenticating...' : 'Sign In'}
+                    </button>
+                </form>
+
+                <div className="relative my-10">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100" /></div>
+                    <div className="relative flex justify-center"><span className="px-4 bg-white text-[10px] text-gray-300 font-bold uppercase tracking-[4px]">Fast Access</span></div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-10">
+                    <button onClick={() => handleDemo('driver')} disabled={demoLoading} className="bg-white border border-gray-100 p-5 rounded-3xl flex flex-col items-center gap-2 hover:border-park-primary hover:bg-park-primary/5 transition-all shadow-sm group">
+                        <Zap size={24} className="text-park-primary group-hover:scale-110 transition-transform" />
+                        <span className="text-[11px] font-black text-park-dark uppercase">Driver Demo</span>
+                    </button>
+                    <button onClick={() => handleDemo('owner')} disabled={demoLoading} className="bg-white border border-gray-100 p-5 rounded-3xl flex flex-col items-center gap-2 hover:border-park-accent hover:bg-park-accent/5 transition-all shadow-sm group">
+                        <ShieldCheck size={24} className="text-park-accent group-hover:scale-110 transition-transform" />
+                        <span className="text-[11px] font-black text-park-dark uppercase">Owner Demo</span>
+                    </button>
+                </div>
+
+                <p className="text-center text-sm font-bold text-gray-400">
+                    New to ParkSaathi? <Link to="/signup" className="text-park-primary underline underline-offset-4 ml-1">Create Account</Link>
+                </p>
             </motion.div>
         </div>
     );

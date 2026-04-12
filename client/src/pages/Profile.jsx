@@ -1,301 +1,209 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { User, Phone, Mail, LogOut, ChevronRight, ShieldCheck, LayoutDashboard, RefreshCw, Bell, Camera, X, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
-import { useAuth } from '../hooks/useAuth';
-import { useGoogleDrive } from '../hooks/useGoogleDrive';
-import apiService from '../services/api';
-import { User, Settings, Shield, Bell, LogOut, RefreshCcw, ChevronRight, CreditCard, Camera, CloudUpload, Globe, X, Check } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-
 const Profile = () => {
-    const { user, profile, signOut, updateProfile, refreshProfile } = useAuth();
     const navigate = useNavigate();
-    const { openPicker } = useGoogleDrive();
+    const { profile, signOut, updateProfile } = useAuth();
 
-    const [loading, setLoading] = useState(false);
-    const [showPhotoModal, setShowPhotoModal] = useState(false);
-    const [isDark, setIsDark] = useState(false);
+    const [editing, setEditing]   = useState(false);
+    const [loading, setLoading]   = useState(false);
+    const [name, setName]         = useState(profile?.name || '');
+    const [phone, setPhone]       = useState(profile?.phone || '');
+    const [saved, setSaved]       = useState(false);
 
-    // Cropping state
-    const [imgSrc, setImgSrc] = useState('');
-    const [crop, setCrop] = useState();
-    const [aspect] = useState(1);
+    // Crop state
+    const [cropModal, setCropModal] = useState(null); // url
+    const [crop, setCrop]           = useState();
+    const [completedCrop, setCompletedCrop] = useState();
     const imgRef = useRef(null);
 
-    const onSelectFile = (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-            setCrop(undefined);
-            const reader = new FileReader();
-            reader.addEventListener('load', () => setImgSrc(reader.result?.toString() || ''));
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    };
+    const isOwner  = (profile?.role || profile?.user_type || '').toLowerCase() === 'owner';
+    const isDemoUser = profile?.id?.startsWith('demo-');
 
-    const onImageLoad = (e) => {
-        const { width, height } = e.currentTarget;
-        setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, aspect, width, height), width, height));
-    };
-
-    const getCroppedImg = useCallback(async () => {
-        if (!imgRef.current || !crop) return;
-
-        const image = imgRef.current;
-        const canvas = document.createElement('canvas');
-        const scaleX = image.naturalWidth / image.width;
-        const scaleY = image.naturalHeight / image.height;
-        canvas.width = crop.width;
-        canvas.height = crop.height;
-        const ctx = canvas.getContext('2d');
-
-        ctx.drawImage(
-            image,
-            crop.x * scaleX,
-            crop.y * scaleY,
-            crop.width * scaleX,
-            crop.height * scaleY,
-            0,
-            0,
-            crop.width,
-            crop.height
-        );
-
-        return new Promise((resolve) => {
-            canvas.toBlob((blob) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(blob);
-                reader.onloadend = () => {
-                   resolve(reader.result.split(',')[1]);
-                };
-            }, 'image/jpeg');
-        });
-    }, [crop]);
-
-    const handleUploadCropped = async () => {
+    const handleSave = async () => {
         setLoading(true);
         try {
-            const base64 = await getCroppedImg();
-            const res = await apiService.uploadDrivePhoto({
-                fileBase64: base64,
-                fileName: `profile_${user.uid}.jpg`,
-                mimeType: 'image/jpeg',
-                uploadType: 'profile'
-            });
-            await refreshProfile();
-            setShowPhotoModal(false);
-            setImgSrc('');
-        } catch (error) {
-            console.error('Profile upload failed', error);
-            alert('Failed to upload profile photo');
-        } finally {
-            setLoading(false);
+            await updateProfile({ name: name.trim(), phone: phone.trim() });
+            setSaved(true);
+            setEditing(false);
+            setTimeout(() => setSaved(false), 3000);
+        } catch { /* error handled by context */ }
+        finally { setLoading(false); }
+    };
+
+    const handlePhotoSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            setCropModal(url);
         }
     };
 
-    const handleDrivePick = () => {
-        openPicker(async (docs) => {
-            if (docs.length > 0) {
-                const doc = docs[0];
-                try {
-                    setLoading(true);
-                    // For Drive selection, we just update the URL directly if we don't want to crop
-                    // but usually you want to save the driveId too
-                    await apiService.updateProfile(profile.id, {
-                        profile_photo_drive_id: doc.id,
-                        profile_photo_url: doc.url
-                    });
-                    await refreshProfile();
-                    setShowPhotoModal(false);
-                } catch (error) {
-                    alert('Failed to set profile from Drive');
-                } finally {
-                    setLoading(false);
-                }
-            }
-        });
+    const saveAvatar = async () => {
+        if (!completedCrop || !imgRef.current) return;
+        const canvas = document.createElement('canvas');
+        const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
+        const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+        canvas.width = completedCrop.width;
+        canvas.height = completedCrop.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imgRef.current, completedCrop.x * scaleX, completedCrop.y * scaleY, completedCrop.width * scaleX, completedCrop.height * scaleY, 0, 0, completedCrop.width, completedCrop.height);
+        
+        const base64 = canvas.toDataURL('image/jpeg');
+        setLoading(true);
+        try {
+            await updateProfile({ profilePhoto: base64 });
+            setCropModal(null);
+        } finally { setLoading(false); }
     };
-
-    const handleToggleMode = async () => {
-        const newType = profile?.user_type === 'owner' ? 'driver' : 'owner';
-        await updateProfile({ user_type: newType });
-        navigate('/dashboard');
-    };
-
-    const toggleDarkMode = () => {
-        setIsDark(!isDark);
-        document.documentElement.classList.toggle('dark');
-    };
-
-    const menuItems = [
-        { title: 'Dark Mode', icon: Settings, color: 'text-gray-700', action: toggleDarkMode, type: 'toggle' },
-        { title: 'Personal Information', icon: User, color: 'text-blue-500' },
-        { title: 'Payment Methods', icon: CreditCard, color: 'text-green-500' },
-        { title: 'Notifications', icon: Bell, color: 'text-orange-500' },
-        { title: 'Security', icon: Shield, color: 'text-purple-500' },
-    ];
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Header / Avatar Section */}
-            <div className="bg-park-primary px-6 pt-16 pb-12 rounded-b-[40px] text-white relative overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl animate-pulse"></div>
-
-                <div className="flex flex-col items-center gap-4 relative z-10">
+        <div className="min-h-screen bg-gray-50 pb-28">
+            <div className="bg-white pt-16 pb-12 px-6 border-b border-gray-100 rounded-b-[42px] shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <User size={150} />
+                </div>
+                
+                <div className="flex flex-col items-center relative z-10">
                     <div className="relative group">
-                        <div className="w-28 h-28 bg-white rounded-[40px] p-1 shadow-2xl transform group-hover:rotate-6 transition-transform">
-                            <div className="w-full h-full bg-park-gray rounded-[36px] flex items-center justify-center text-park-primary overflow-hidden">
-                                {profile?.profile_photo_url ? (
-                                    <img src={profile.profile_photo_url} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <User size={54} />
-                                )}
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => setShowPhotoModal(true)}
-                            className="absolute -bottom-2 -right-2 bg-white text-park-primary p-2.5 rounded-2xl shadow-lg border border-park-primary/5 hover:scale-110 active:scale-95 transition-all"
-                        >
-                            <Camera size={20} />
-                        </button>
-                    </div>
-                    
-                    <div className="text-center">
-                        <h1 className="text-2xl font-bold font-outfit">{profile?.fullName || profile?.full_name || 'User'}</h1>
-                        <p className="text-white/70 text-sm">{user?.email}</p>
-                    </div>
-
-                    <div className="bg-white/15 backdrop-blur-md px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 border border-white/20">
-                        <div className={`w-2 h-2 rounded-full ${profile?.user_type === 'owner' ? 'bg-park-accent' : 'bg-green-400'}`}></div>
-                        {profile?.user_type} Mode
-                    </div>
-                </div>
-            </div>
-
-            {/* Role Switch & Menu */}
-            <div className="px-6 -mt-6">
-                <button
-                    onClick={handleToggleMode}
-                    className="w-full bg-white p-5 rounded-3xl shadow-xl shadow-park-primary/5 border border-park-primary/5 flex items-center justify-between group active:scale-[0.98] transition-all"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="bg-park-primary/10 p-3.5 rounded-2xl group-hover:bg-park-primary transition-colors">
-                            <RefreshCcw className="text-park-primary group-hover:text-white group-hover:rotate-180 transition-all duration-700" size={24} />
-                        </div>
-                        <div className="text-left">
-                            <h4 className="font-bold text-park-dark">Switch to {profile?.user_type === 'owner' ? 'Driver' : 'Owner'} Mode</h4>
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tighter">Instant Role Swap</p>
-                        </div>
-                    </div>
-                    <ChevronRight className="text-gray-300 group-hover:text-park-primary transition-colors" size={20} />
-                </button>
-            </div>
-
-            <div className="p-6 space-y-4 pb-24">
-                <div className="grid grid-cols-1 gap-2">
-                    {menuItems.map((item, index) => (
-                        <button
-                            key={index}
-                            onClick={item.action}
-                            className="w-full bg-white dark:bg-gray-800 p-4 rounded-2xl flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
-                        >
-                            <div className="flex items-center gap-4">
-                                <item.icon className={`${item.color}`} size={20} />
-                                <span className="text-sm font-bold text-park-dark dark:text-white">{item.title}</span>
-                            </div>
-                            {item.type === 'toggle' ? (
-                                <div className={`w-11 h-6 rounded-full relative transition-colors ${isDark ? 'bg-park-primary' : 'bg-gray-200'}`}>
-                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isDark ? 'right-1' : 'left-1'}`}></div>
-                                </div>
+                        <div className="w-28 h-28 rounded-[36px] bg-gradient-to-br from-park-primary to-park-dark flex items-center justify-center shadow-2xl shadow-park-primary/30 overflow-hidden ring-4 ring-white">
+                            {profile?.profilePhoto ? (
+                                <img src={profile.profilePhoto} alt="avatar" className="w-full h-full object-cover" />
                             ) : (
-                                <ChevronRight className="text-gray-300" size={16} />
+                                <span className="text-4xl font-black text-white">{(profile?.name || 'U')[0].toUpperCase()}</span>
                             )}
-                        </button>
-                    ))}
+                        </div>
+                        <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-park-primary text-white rounded-2xl shadow-xl flex items-center justify-center border-4 border-white cursor-pointer hover:scale-110 active:scale-95 transition-all">
+                            <Camera size={18} />
+                            <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+                        </label>
+                    </div>
+
+                    <div className="mt-6 text-center">
+                        <h1 className="text-2xl font-black text-park-dark font-outfit">{profile?.name || 'User'}</h1>
+                        <p className="text-sm text-gray-400 font-medium">{profile?.email}</p>
+                        <div className="flex items-center justify-center gap-2 mt-3">
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-sm ${
+                                isOwner ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                                {isOwner ? 'House Owner' : 'Driver'}
+                            </span>
+                            {isDemoUser && <span className="text-[10px] font-black bg-park-dark text-white px-3 py-1.5 rounded-full shadow-sm">DEMO</span>}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6 space-y-6 max-w-lg mx-auto">
+                {saved && (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-emerald-700 text-xs font-black shadow-sm">
+                        <ShieldCheck size={18} /> PROFILE UPDATED SUCCESSFULLY
+                    </motion.div>
+                )}
+
+                <div className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                            <User size={14} className="text-park-primary" /> Personal Information
+                        </h3>
+                        {editing ? (
+                            <div className="flex gap-2">
+                                <button onClick={() => setEditing(false)} className="p-2 text-gray-400"><X size={18} /></button>
+                                <button onClick={handleSave} disabled={loading} className="bg-park-primary text-white p-2 rounded-xl shadow-lg"><Check size={18} /></button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setEditing(true)} className="text-[10px] font-black underline text-park-primary uppercase tracking-wider">Modify</button>
+                        )}
+                    </div>
+
+                    <div className="space-y-6">
+                        {[
+                            { icon: User,  label: 'Full Name', value: name,  set: setName,  type: 'text' },
+                            { icon: Phone, label: 'Phone No',  value: phone, set: setPhone, type: 'tel' },
+                            { icon: Mail,  label: 'Email ID',  value: profile?.email || '', readonly: true },
+                        ].map(({ icon: Icon, label, value, set, type, readonly }) => (
+                            <div key={label} className="group">
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-2 group-focus-within:text-park-primary transition-colors">
+                                    <Icon size={12} /> {label}
+                                </p>
+                                {editing && !readonly ? (
+                                    <input type={type} className="w-full text-sm font-bold text-park-dark bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-park-primary/20 focus:bg-white transition-all" value={value} onChange={e => set(e.target.value)} />
+                                ) : (
+                                    <p className="text-sm font-black text-park-dark">{value || 'Not set'}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
-                <button
-                    onClick={signOut}
-                    className="w-full mt-4 bg-red-50 text-red-600 p-5 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm hover:bg-red-100 transition-colors"
-                >
-                    <LogOut size={20} /> Sign Out
+                <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+                    <button onClick={() => navigate('/dashboard')} className="w-full flex items-center gap-4 p-5 border-b border-gray-50 hover:bg-gray-50 transition-colors text-left group">
+                        <div className="bg-blue-50 p-3.5 rounded-2xl text-blue-500 group-hover:scale-110 transition-transform"><LayoutDashboard size={20} /></div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-black text-park-dark text-sm uppercase tracking-tight">Dashboard</p>
+                            <p className="text-[11px] text-gray-400">View activity & stats</p>
+                        </div>
+                        <ChevronRight size={18} className="text-gray-300" />
+                    </button>
+                    <button onClick={() => navigate('/notifications')} className="w-full flex items-center gap-4 p-5 border-b border-gray-50 hover:bg-gray-50 transition-colors text-left group">
+                        <div className="bg-purple-50 p-3.5 rounded-2xl text-purple-500 group-hover:scale-110 transition-transform"><Bell size={20} /></div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-black text-park-dark text-sm uppercase tracking-tight">Notifications</p>
+                            <p className="text-[11px] text-gray-400">Alerts & messages</p>
+                        </div>
+                        <ChevronRight size={18} className="text-gray-300" />
+                    </button>
+                    <button 
+                        onClick={async () => {
+                            const newRole = isOwner ? 'Driver' : 'Owner';
+                            setLoading(true);
+                            await updateProfile({ role: newRole, user_type: newRole.toLowerCase() });
+                            setLoading(false);
+                            navigate('/dashboard');
+                        }} 
+                        className="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors text-left group"
+                    >
+                        <div className={`p-3.5 rounded-2xl group-hover:scale-110 transition-transform ${isOwner ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500'}`}>
+                            <RefreshCw size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-black text-park-dark text-sm uppercase tracking-tight">Switch to {isOwner ? 'Driver' : 'Host'}</p>
+                            <p className="text-[11px] text-gray-400">Change your active persona</p>
+                        </div>
+                        <ChevronRight size={18} className="text-gray-300" />
+                    </button>
+                </div>
+
+                <button onClick={signOut} className="w-full py-5 bg-red-50 text-red-500 rounded-[32px] font-black text-sm uppercase tracking-[3px] border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                    Sign Out
                 </button>
             </div>
 
-            {/* Photo Upload Modal */}
+            {/* Avatar Crop Modal */}
             <AnimatePresence>
-                {showPhotoModal && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-                            className="w-full max-w-md bg-white rounded-[40px] overflow-hidden shadow-2xl"
-                        >
-                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                                <h3 className="text-xl font-bold text-park-dark font-outfit">Update Photo</h3>
-                                <button onClick={() => { setShowPhotoModal(false); setImgSrc(''); }} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20}/></button>
-                            </div>
-
-                            <div className="p-8">
-                                {!imgSrc ? (
-                                    <div className="space-y-4">
-                                        <button onClick={handleDrivePick} className="w-full flex items-center gap-4 p-5 bg-blue-50 text-blue-700 rounded-3xl border border-blue-100 hover:bg-blue-100 transition-colors">
-                                            <div className="bg-white p-3 rounded-2xl shadow-sm"><Globe size={24}/></div>
-                                            <div className="text-left">
-                                                <p className="font-bold">Google Drive</p>
-                                                <p className="text-[10px] opacity-70">Pick from your Drive files</p>
-                                            </div>
-                                        </button>
-
-                                        <label className="w-full flex items-center gap-4 p-5 bg-park-gray text-park-dark rounded-3xl border border-gray-100 hover:bg-gray-100 transition-colors cursor-pointer">
-                                            <div className="bg-white p-3 rounded-2xl shadow-sm"><CloudUpload size={24}/></div>
-                                            <div className="text-left">
-                                                <p className="font-bold">Upload New</p>
-                                                <p className="text-[10px] opacity-70">Take a photo or pick from device</p>
-                                            </div>
-                                            <input type="file" accept="image/*" className="hidden" onChange={onSelectFile} />
-                                        </label>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-6">
-                                        <div className="rounded-3xl overflow-hidden border border-gray-100">
-                                            <ReactCrop
-                                                crop={crop}
-                                                onChange={(c) => setCrop(c)}
-                                                aspect={aspect}
-                                                circularCrop
-                                            >
-                                                <img 
-                                                    ref={imgRef}
-                                                    src={imgSrc} 
-                                                    alt="Crop" 
-                                                    onLoad={onImageLoad}
-                                                    className="w-full max-h-[40vh] object-contain" 
-                                                />
-                                            </ReactCrop>
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <button 
-                                                onClick={() => setImgSrc('')}
-                                                className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold flex items-center justify-center gap-2"
-                                            >
-                                                <X size={18}/> Cancel
-                                            </button>
-                                            <button 
-                                                onClick={handleUploadCropped}
-                                                disabled={loading}
-                                                className="flex-1 py-4 bg-park-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-park-primary/20"
-                                            >
-                                                {loading ? <RefreshCcw className="animate-spin" size={18}/> : <Check size={18}/>}
-                                                {loading ? 'Uploading...' : 'Save Photo'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
+                {cropModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/90 z-[3000] flex flex-col p-8">
+                        <div className="flex justify-between items-center text-white mb-6">
+                            <h2 className="font-black font-outfit text-xl uppercase tracking-widest">Update Avatar</h2>
+                            <button onClick={() => setCropModal(null)}><X size={28} /></button>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center overflow-hidden bg-black/40 rounded-3xl border border-white/10">
+                            <ReactCrop crop={crop} onChange={c => setCrop(c)} onComplete={c => setCompletedCrop(c)} aspect={1} circularCrop>
+                                <img ref={imgRef} src={cropModal} alt="Avatar Source" onLoad={(e) => {
+                                    const { width, height } = e.currentTarget;
+                                    setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height));
+                                }} className="max-h-[50vh] object-contain" />
+                            </ReactCrop>
+                        </div>
+                        <div className="mt-8 flex gap-4">
+                            <button onClick={() => setCropModal(null)} className="flex-1 py-5 bg-white/10 text-white font-black text-sm rounded-[24px]">CANCEL</button>
+                            <button onClick={saveAvatar} className="flex-1 py-5 bg-park-primary text-white font-black text-sm rounded-[24px] shadow-xl">SAVE AVATAR</button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -304,4 +212,3 @@ const Profile = () => {
 };
 
 export default Profile;
-

@@ -1,279 +1,149 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { UserPlus, Car, Home as House, ArrowRight, User, Phone, Mail, Lock } from 'lucide-react';
-
+import { UserPlus, Car, Home as HouseIcon, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Signup = () => {
-    const [step, setStep] = useState(1); // 1: Role, 2: Info
-    const [role, setRole] = useState(null); // 'driver' or 'owner'
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [password, setPassword] = useState('');
-    const [fullName, setFullName] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const { signup, user } = useAuth();
 
-    const [otp, setOtp] = useState('');
-    const [verifying, setVerifying] = useState(false);
+    useEffect(() => {
+        if (user) navigate('/dashboard', { replace: true });
+    }, [user, navigate]);
 
-    const { signup, verifyOtp } = useAuth();
+    const [step, setStep]               = useState(1);
+    const [role, setRole]               = useState('driver');
+    const [fullName, setFullName]       = useState('');
+    const [email, setEmail]             = useState('');
+    const [phone, setPhone]             = useState('');
+    const [password, setPassword]       = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading]         = useState(false);
+    const [error, setError]             = useState('');
+
+    const validate = () => {
+        if (!fullName) { setError('Full name is required'); return false; }
+        if (fullName.length < 3) { setError('Name is too short'); return false; }
+        if (!email) { setError('Email is required'); return false; }
+        if (!/\S+@\S+\.\S+/.test(email)) { setError('Invalid email format'); return false; }
+        if (!password) { setError('Password is required'); return false; }
+        if (password.length < 6) { setError('Password must be at least 6 characters'); return false; }
+        return true;
+    };
 
     const handleSignup = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setError(null);
+        setError('');
+        if (!validate()) return;
 
+        setLoading(true);
         try {
             await signup({
-                email,
-                phone,
-                full_name: fullName,
+                name: fullName.trim(),
+                email: email.trim().toLowerCase(),
+                password,
+                phone: phone.trim(),
+                role: role.charAt(0).toUpperCase() + role.slice(1),
                 user_type: role,
-                password
             });
-            // On success, backend sends OTP and we move to OTP step
-            setStep(3);
+            navigate('/dashboard');
         } catch (err) {
-            setError(err);
+            setError(err.message || 'Signup failed. Email might already exist.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setVerifying(true);
-        setError(null);
-
-        try {
-            await verifyOtp(phone, otp);
-            // After phone verification, we inform them to check email too, but for MVP we can navigate
-            alert("Phone Verified! Please also verify your email via the link sent to you.");
-            navigate('/dashboard');
-        } catch (err) {
-            setError(err);
-        } finally {
-            setVerifying(false);
-        }
-    };
-
+    const roles = [
+        { id: 'driver', icon: Car, title: 'I\'m a Driver', sub: 'Find parking near me', grad: 'from-emerald-400 to-park-primary' },
+        { id: 'owner',  icon: HouseIcon, title: 'I\'m a Host', sub: 'Rent out my space', grad: 'from-amber-400 to-park-accent' },
+    ];
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center px-6 pt-12 overflow-x-hidden">
-            <div className="w-full max-w-md">
+        <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12 pb-12 overflow-y-auto">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm">
+                <div className="flex flex-col items-center mb-10">
+                    <div className="bg-white p-4 rounded-[28px] shadow-xl border border-gray-100 mb-4">
+                        <img src="/logo.png" alt="logo" className="w-12 h-12" />
+                    </div>
+                    <h1 className="text-3xl font-black text-park-dark font-outfit">Join Us</h1>
+                    <p className="text-gray-400 text-sm font-medium">Smart Parking for Everyone</p>
+                </div>
+
+                <div className="flex justify-center gap-2 mb-10">
+                    {[1, 2].map(s => (
+                        <div key={s} className={`h-1.5 rounded-full transition-all duration-500 ${step >= s ? 'w-12 bg-park-primary' : 'w-6 bg-gray-100'}`} />
+                    ))}
+                </div>
+
                 <AnimatePresence mode="wait">
                     {step === 1 ? (
-                        <motion.div
-                            key="step1"
-                            initial={{ opacity: 0, x: 50 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -50 }}
-                            className="space-y-8"
-                        >
-                            <div className="text-center">
-                                <div className="inline-block bg-white p-3 rounded-2xl shadow-sm mb-4">
-                                    <img src="/logo.png" alt="ParkSaathi" className="w-12 h-12" />
-                                </div>
-                                <h1 className="text-3xl font-bold text-park-dark mb-2 font-outfit">Join ParkSaathi</h1>
-                                <p className="text-gray-500 font-medium">Choose your primary role</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4">
+                        <motion.div key="s1" initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }} className="space-y-4">
+                            <h2 className="text-center font-black text-gray-400 uppercase tracking-[4px] text-[10px] mb-6">Choose Your Role</h2>
+                            {roles.map(r => (
                                 <button
-                                    onClick={() => { setRole('driver'); setStep(2); }}
-                                    className={`flex items-center p-6 rounded-3xl transition-all duration-300 border-2 text-left group ${role === 'driver' ? 'border-park-primary bg-park-primary/5' : 'border-white bg-white'
-                                        } shadow-md hover:shadow-xl`}
+                                    key={r.id} onClick={() => { setRole(r.id); setStep(2); }}
+                                    className={`w-full p-6 rounded-[32px] border-2 bg-white flex items-center gap-5 transition-all hover:scale-[1.02] active:scale-[0.98] ${role === r.id ? 'border-park-primary shadow-2xl shadow-park-primary/10' : 'border-gray-50 shadow-sm'}`}
                                 >
-                                    <div className="bg-park-primary/10 p-4 rounded-2xl mr-4 group-hover:scale-110 transition-transform">
-                                        <Car className="text-park-primary w-8 h-8" />
+                                    <div className={`w-14 h-14 bg-gradient-to-br ${r.grad} rounded-2xl flex items-center justify-center text-white shadow-lg`}><r.icon size={26} /></div>
+                                    <div className="text-left flex-1">
+                                        <p className="font-black text-park-dark text-lg leading-none">{r.title}</p>
+                                        <p className="text-xs text-gray-400 mt-1.5">{r.sub}</p>
                                     </div>
-                                    <div className="flex-1">
-                                        <span className="text-lg font-bold text-park-dark">I want to Park</span>
-                                        <p className="text-gray-400 text-xs mt-1">Search, book and navigate to slots</p>
-                                    </div>
-                                    <ArrowRight size={20} className="text-gray-300" />
+                                    <ArrowRight size={20} className="text-gray-200" />
                                 </button>
-
-                                <button
-                                    onClick={() => { setRole('owner'); setStep(2); }}
-                                    className={`flex items-center p-6 rounded-3xl transition-all duration-300 border-2 text-left group ${role === 'owner' ? 'border-park-primary bg-park-primary/5' : 'border-white bg-white'
-                                        } shadow-md hover:shadow-xl`}
-                                >
-                                    <div className="bg-park-accent/10 p-4 rounded-2xl mr-4 group-hover:scale-110 transition-transform">
-                                        <House className="text-park-accent w-8 h-8" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <span className="text-lg font-bold text-park-dark">I have a Space</span>
-                                        <p className="text-gray-400 text-xs mt-1">List your spot and track earnings</p>
-                                    </div>
-                                    <ArrowRight size={20} className="text-gray-300" />
-                                </button>
-                            </div>
-
-                            <p className="text-center text-gray-500 font-medium pt-4">
-                                Already have an account?{' '}
-                                <Link to="/login" className="text-park-primary font-bold">Log in</Link>
-                            </p>
-                        </motion.div>
-                    ) : step === 2 ? (
-                        <motion.div
-                            key="step2"
-                            initial={{ opacity: 0, x: 50 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -50 }}
-                            className="space-y-6"
-                        >
-                            <button
-                                onClick={() => setStep(1)}
-                                className="text-park-primary font-bold flex items-center gap-2 mb-4 hover:gap-3 transition-all"
-                            >
-                                <ArrowRight className="rotate-180" size={20} /> Back
-                            </button>
-
-                            <div className="mb-8">
-                                <h2 className="text-3xl font-bold text-park-dark font-outfit">
-                                    {role === 'driver' ? 'Driver Registration' : 'House Owner Info'}
-                                </h2>
-                                <p className="text-gray-500 text-sm mt-1">Complete your profile to get started</p>
-                            </div>
-
-                            <form onSubmit={handleSignup} className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Full Name</label>
-                                    <div className="relative">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
-                                            type="text"
-                                            placeholder="John Doe"
-                                            className="input-field pl-12"
-                                            value={fullName}
-                                            onChange={(e) => setFullName(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Phone Number</label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
-                                            type="tel"
-                                            placeholder="+91 9876543210"
-                                            className="input-field pl-12"
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Email</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
-                                            type="email"
-                                            placeholder="name@example.com"
-                                            className="input-field pl-12"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase ml-1 mb-2">Password</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
-                                            type="password"
-                                            placeholder="••••••••"
-                                            className="input-field pl-12"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                {error && (
-                                    <p className="text-red-500 text-sm text-center font-medium bg-red-50 p-3 rounded-xl">{error}</p>
-                                )}
-
-                                <div className="pt-4">
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full button-primary flex items-center justify-center gap-2 py-4"
-                                    >
-                                        {loading ? 'Creating Account...' : (
-                                            <>
-                                                <UserPlus size={20} />
-                                                Join ParkSaathi
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
+                            ))}
                         </motion.div>
                     ) : (
-                        <motion.div
-                            key="step3"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-white p-8 rounded-[2.5rem] shadow-2xl space-y-8"
-                        >
-                            <div className="text-center">
-                                <div className="w-20 h-20 bg-park-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                                    <Phone className="text-park-primary w-10 h-10" />
-                                </div>
-                                <h2 className="text-3xl font-black text-park-dark mb-2">Verify Phone</h2>
-                                <p className="text-gray-400 text-sm px-4">
-                                    We've sent a 6-digit code to <span className="font-bold text-park-dark">{phone}</span>
-                                </p>
+                        <motion.form key="s2" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} onSubmit={handleSignup} className="space-y-4">
+                            <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-black text-park-dark font-outfit uppercase tracking-tighter">Your Details</h3>
+                                <button type="button" onClick={() => setStep(1)} className="text-[10px] font-black underline text-park-primary">BACK</button>
                             </div>
 
-                            <form onSubmit={handleVerifyOtp} className="space-y-6">
-                                <div>
-                                    <input
-                                        type="text"
-                                        maxLength="6"
-                                        placeholder="000000"
-                                        className="w-full text-center text-4xl font-black tracking-[1rem] py-6 rounded-3xl border-2 border-gray-100 focus:border-park-primary focus:ring-4 focus:ring-park-primary/10 outline-none transition-all placeholder:text-gray-100"
-                                        value={otp}
-                                        onChange={(e) => setOtp(e.target.value)}
-                                        required
-                                    />
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Full Name</label>
+                                <input type="text" placeholder="John Doe" className="input-field" value={fullName} onChange={e => { setFullName(e.target.value); setError(''); }} />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
+                                <input type="email" placeholder="john@email.com" className="input-field" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Mobile No</label>
+                                <input type="tel" placeholder="9876543210" className="input-field" value={phone} onChange={e => { setPhone(e.target.value); setError(''); }} />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Password</label>
+                                <div className="relative">
+                                    <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="input-field pr-12" value={password} onChange={e => { setPassword(e.target.value); setError(''); }} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300">
+                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
                                 </div>
+                            </div>
 
+                            <AnimatePresence>
                                 {error && (
-                                    <div className="bg-red-50 text-red-500 p-4 rounded-2xl flex items-center gap-3 text-sm font-bold">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                        {error}
-                                    </div>
+                                    <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-red-50 text-red-500 rounded-2xl text-[11px] font-bold border border-red-100 flex items-center gap-2">
+                                        <AlertCircle size={14} /> {error}
+                                    </motion.div>
                                 )}
+                            </AnimatePresence>
 
-                                <button
-                                    type="submit"
-                                    disabled={verifying}
-                                    className="w-full button-primary py-5 rounded-3xl shadow-xl shadow-park-primary/30 flex items-center justify-center gap-3"
-                                >
-                                    {verifying ? (
-                                        <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>Complete Verification <ArrowRight size={20} /></>
-                                    )}
-                                </button>
-                            </form>
-                        </motion.div>
+                            <button type="submit" disabled={loading} className="button-primary w-full py-4.5 text-base flex items-center justify-center gap-2 shadow-2xl shadow-park-primary/25 disabled:opacity-50">
+                                {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle2 size={20} />}
+                                {loading ? 'Creating...' : `Join as ${role}`}
+                            </button>
+                        </motion.form>
                     )}
                 </AnimatePresence>
-            </div>
+
+                <p className="text-center text-sm font-bold text-gray-400 mt-10">
+                    Already with us? <Link to="/login" className="text-park-primary underline underline-offset-4 ml-1">Login here</Link>
+                </p>
+            </motion.div>
         </div>
     );
 };

@@ -1,171 +1,184 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft, IndianRupee, ShieldCheck, CheckCircle2, CreditCard, Wallet, Smartphone, Landmark } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronLeft, CreditCard, ShieldCheck, CheckCircle2, Loader2, AlertCircle, Calendar, MapPin, IndianRupee } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiService from '../services/api';
 
-
 const Payment = () => {
+    const location = useLocation();
     const navigate = useNavigate();
-    const { state } = useLocation();
+    const { booking } = location.state || {};
 
-    const [transactionId] = useState(() => `PS_${Math.floor(Math.random() * 900000000) + 100000000}`);
-    const [selectedMode, setSelectedMode] = useState('UPI');
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
+    const [cardNumber, setCardNumber] = useState('');
+    const [expiry, setExpiry]         = useState('');
+    const [cvv, setCvv]               = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [status, setStatus]         = useState('idle'); // idle, loading, success, error
+    const [error, setError]           = useState('');
 
-    const amount = state?.amount || 150;
-    const bookingData = state?.bookingData;
+    useEffect(() => {
+        if (!booking) navigate('/dashboard');
+    }, [booking, navigate]);
 
-    const paymentModes = [
-        { id: 'UPI', name: 'UPI (GPay / PhonePe)', icon: Smartphone, color: 'text-blue-500', bg: 'bg-blue-50' },
-        { id: 'Card', name: 'Credit / Debit Card', icon: CreditCard, color: 'text-purple-500', bg: 'bg-purple-50' },
-        { id: 'Wallet', name: 'Digital Wallet', icon: Wallet, color: 'text-orange-500', bg: 'bg-orange-50' },
-        { id: 'NetBanking', name: 'Net Banking', icon: Landmark, color: 'text-gray-600', bg: 'bg-gray-50' },
-    ];
+    if (!booking) return null;
 
-    const handlePayment = async (status = 'Success') => {
-        setIsProcessing(true);
+    const formatCardNumber = (val) => {
+        const raw = val.replace(/\D/g, '');
+        const chunks = raw.match(/.{1,4}/g) || [];
+        return chunks.join(' ').substr(0, 19);
+    };
+
+    const handlePayment = async (e) => {
+        e.preventDefault();
+        if (cardNumber.length < 19) { setError('Invalid card number'); return; }
+        if (expiry.length < 5) { setError('Invalid expiry'); return; }
+        if (cvv.length < 3) { setError('Invalid CVV'); return; }
+
+        setProcessing(true);
+        setStatus('loading');
+        setError('');
 
         try {
-            // Simulate payment processing time
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            await apiService.createPayment({
-                booking_id: bookingData?.id,
-                amount: amount,
-                mode: selectedMode,
-                transaction_id: status === 'Success' ? transactionId : null,
-                status: status
+            const response = await apiService.processPayment({
+                booking_id: booking.id || booking._id,
+                amount:     booking.totalPrice || booking.total_price,
+                status:     'Success',
+                cardNumber: cardNumber
             });
 
-            setIsProcessing(false);
-            if (status === 'Success') {
-                setIsSuccess(true);
-            } else {
-                alert("Payment Failed! Your booking request has been cancelled.");
-                navigate('/bookings');
-            }
-        } catch (e) {
-            console.error("Payment failed", e);
-            alert("Payment failed: " + e.message);
-            setIsProcessing(false);
+            // Simulate server response delay for realism
+            await new Promise(r => setTimeout(r, 2000));
+            
+            setStatus('success');
+            setTimeout(() => navigate(`/navigation/${booking.id || booking._id}`), 2500);
+        } catch (err) {
+            setError(err.message || 'Payment failed. Please try again.');
+            setStatus('error');
+            setProcessing(false);
         }
     };
 
-    if (isSuccess) {
+    if (status === 'success') {
         return (
-            <div className="min-h-screen bg-park-primary flex flex-col items-center justify-center p-6 text-center">
-                <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="bg-white p-8 rounded-[40px] shadow-2xl flex flex-col items-center max-w-sm w-full"
-                >
-                    <div className="bg-green-100 p-6 rounded-full mb-6">
-                        <CheckCircle2 size={64} className="text-green-600" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-park-dark font-outfit mb-2">Payment Paid!</h2>
-                    <p className="text-gray-500 mb-8 font-medium">Your parking spot at <span className="text-park-primary font-bold">{bookingData?.name || 'Ashok Vihar'}</span> has been successfully booked.</p>
-
-                    <div className="bg-park-gray w-full p-6 rounded-3xl mb-8 flex justify-between items-center border border-gray-100">
-                        <div className="text-left">
-                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Transaction ID</p>
-                            <p className="font-bold text-park-dark">{transactionId}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Amount</p>
-                            <p className="font-bold text-park-primary text-xl">₹{amount}</p>
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => navigate('/bookings')}
-                        className="w-full button-primary py-4"
-                    >
-                        View Bookings
-                    </button>
+            <div className="h-screen flex flex-col items-center justify-center bg-white p-10 text-center">
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }} className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                    <CheckCircle2 size={52} className="text-green-500" />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                    <h2 className="text-3xl font-black text-park-dark font-outfit mb-2">Payment Success!</h2>
+                    <p className="text-gray-400 font-medium">Your parking spot is reserved. Redirecting to navigation...</p>
                 </motion.div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 relative overflow-hidden">
-            <div className="bg-white px-6 pt-12 pb-6 flex items-center gap-4 relative z-10">
-                <button onClick={() => navigate(-1)} className="p-2 bg-gray-50 rounded-full text-park-dark">
-                    <ChevronLeft size={24} />
-                </button>
-                <h1 className="text-2xl font-bold text-park-dark font-outfit">Payment</h1>
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="px-5 pt-12 pb-6 flex items-center gap-4 bg-white border-b border-gray-100">
+                <button onClick={() => navigate(-1)} className="p-2 bg-gray-100 rounded-xl"><ChevronLeft size={22} /></button>
+                <h1 className="text-xl font-black text-park-dark font-outfit">Checkout</h1>
             </div>
 
-            <div className="p-6 relative z-10">
-                <div className="bg-park-dark rounded-[32px] p-8 text-white mb-8 shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                    <div className="relative z-10">
-                        <p className="text-white/60 text-sm font-bold uppercase tracking-widest mb-1">Total Payable</p>
-                        <div className="flex items-end gap-2">
-                            <IndianRupee size={32} className="mb-2" />
-                            <h2 className="text-5xl font-bold font-outfit">{amount}</h2>
+            <div className="p-5 space-y-6">
+                {/* Summary Card */}
+                <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1 pr-4">
+                            <h3 className="font-black text-lg text-park-dark font-outfit truncate">{booking.spotName}</h3>
+                            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"><MapPin size={10} /> {booking.spotAddress}</p>
                         </div>
-                        <div className="mt-6 flex items-center gap-2 text-xs text-white/40">
-                            <ShieldCheck size={14} />
-                            Secure encrypted transaction
+                        <div className="text-right">
+                            <p className="text-2xl font-black text-park-primary">₹{booking.totalPrice || booking.total_price}</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Due</p>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-3 py-3 border-t border-dashed border-gray-100 mt-2">
+                        <Calendar size={14} className="text-park-primary" />
+                        <span className="text-xs font-bold text-gray-600">Reserved for Today</span>
                     </div>
                 </div>
 
-                <h3 className="font-bold text-park-dark mb-4 ml-2">Choose Payment Mode</h3>
-                <div className="space-y-4 mb-8">
-                    {paymentModes.map((mode) => (
-                        <button
-                            key={mode.id}
-                            disabled={isProcessing}
-                            onClick={() => setSelectedMode(mode.id)}
-                            className={`w-full p-5 rounded-3xl flex items-center justify-between transition-all border-2 ${selectedMode === mode.id
-                                ? 'border-park-primary bg-white shadow-lg scale-[1.02]'
-                                : 'border-transparent bg-white shadow-sm'
-                                }`}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className={`${mode.bg} p-3 rounded-2xl`}>
-                                    <mode.icon className={mode.color} size={24} />
-                                </div>
-                                <span className="font-bold text-park-dark">{mode.name}</span>
+                {/* Card Info */}
+                <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                            <CreditCard size={14} className="text-park-primary" /> Payment details
+                        </h3>
+                        <div className="flex gap-1">
+                            <div className="w-8 h-5 bg-gray-100 rounded" />
+                            <div className="w-8 h-5 bg-gray-100 rounded" />
+                        </div>
+                    </div>
+
+                    <form onSubmit={handlePayment} className="space-y-4">
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Card Number</label>
+                            <div className="relative">
+                                <CreditCard size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                                <input
+                                    type="text" placeholder="0000 0000 0000 0000"
+                                    className="input-field pl-12"
+                                    value={cardNumber} onChange={e => { setCardNumber(formatCardNumber(e.target.value)); setError(''); }}
+                                    maxLength={19}
+                                />
                             </div>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedMode === mode.id ? 'border-park-primary' : 'border-gray-200'
-                                }`}>
-                                {selectedMode === mode.id && <div className="w-3 h-3 rounded-full bg-park-primary"></div>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Expiry</label>
+                                <input
+                                    type="text" placeholder="MM/YY"
+                                    className="input-field"
+                                    value={expiry} onChange={e => {
+                                        let v = e.target.value.replace(/\D/g, '').substr(0, 4);
+                                        if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                                        setExpiry(v);
+                                        setError('');
+                                    }}
+                                />
                             </div>
-                        </button>
-                    ))}
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">CVV</label>
+                                <input
+                                    type="password" placeholder="123"
+                                    className="input-field"
+                                    value={cvv} onChange={e => { setCvv(e.target.value.replace(/\D/g, '').substr(0, 3)); setError(''); }}
+                                />
+                            </div>
+                        </div>
+
+                        <AnimatePresence>
+                            {error && (
+                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-4 bg-red-50 text-red-500 rounded-2xl text-[11px] font-bold border border-red-100 flex items-center gap-2">
+                                    <AlertCircle size={16} /> {error}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        <div className="pt-4 flex flex-col gap-4">
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="button-primary w-full py-4.5 text-base flex items-center justify-center gap-2 shadow-2xl shadow-park-primary/20 disabled:opacity-50"
+                            >
+                                {processing ? <Loader2 size={20} className="animate-spin" /> : <ShieldCheck size={20} />}
+                                {processing ? 'Verifying Transaction...' : `Securely Pay ₹${booking.totalPrice || booking.total_price}`}
+                            </button>
+                            <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                <ShieldCheck size={12} className="text-green-500" /> SSL Encrypted Secured Payment
+                            </div>
+                        </div>
+                    </form>
                 </div>
-
-                <button
-                    onClick={() => handlePayment('Success')}
-                    disabled={isProcessing}
-                    className="w-full button-primary py-5 text-lg flex items-center justify-center gap-3 shadow-2xl shadow-park-primary/30"
-                >
-                    {isProcessing ? (
-                        <>
-                            <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                            />
-                            Processing...
-                        </>
-                    ) : (
-                        <>Proceed to Pay ₹{amount}</>
-                    )}
-                </button>
-
-                <button
-                    onClick={() => handlePayment('Failed')}
-                    disabled={isProcessing}
-                    className="w-full mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-red-500 transition-colors"
-                >
-                    Simulate Payment Failure
-                </button>
+                
+                {/* Hints for QA */}
+                <div className="p-4 bg-gray-100 rounded-2xl">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">QA Test Cards:</p>
+                    <div className="space-y-1">
+                        <p className="text-[11px] font-mono text-gray-600">Success: 4242 4242 4242 4242</p>
+                        <p className="text-[11px] font-mono text-gray-600">Decline: 4000 0000 0000 0002</p>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -9,7 +9,6 @@ export const AuthProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // ── Bootstrap: restore session on refresh ─────────────────────────
     useEffect(() => {
         const restore = async () => {
             // 1. Demo session
@@ -29,10 +28,11 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 try {
                     const { data } = await apiService.getProfile();
-                    setUser({ uid: data.profile.id, email: data.profile.email });
-                    setProfile(data.profile);
+                    const p = data.profile;
+                    setUser({ uid: p.id, email: p.email });
+                    setProfile(p);
                 } catch {
-                    setStoredToken(null); // token expired / invalid
+                    setStoredToken(null);
                 }
             }
             setLoading(false);
@@ -40,42 +40,45 @@ export const AuthProvider = ({ children }) => {
         restore();
     }, []);
 
-    // ── Login ──────────────────────────────────────────────────────────
     const login = useCallback(async (email, password) => {
-        // Demo shortcuts
+        // Demo bypass (works offline)
         const DEMOS = {
-            'driver@demo.com': { uid: 'demo-driver-id', role: 'Driver', name: 'Rahul (Demo Driver)', phone: '9876543210' },
-            'owner@demo.com':  { uid: 'demo-owner-id',  role: 'Owner',  name: 'Priya (Demo Owner)',  phone: '9123456780' },
+            'driver@demo.com': { uid: 'demo-driver-001', role: 'Driver', name: 'Rahul (Demo Driver)', phone: '9876543210' },
+            'owner@demo.com':  { uid: 'demo-owner-001',  role: 'Owner',  name: 'Priya (Demo Owner)',  phone: '9123456780' },
         };
         if (DEMOS[email] && password === 'demo123') {
             const d = DEMOS[email];
             const demoUser    = { uid: d.uid, email };
-            const demoProfile = { id: d.uid, email, fullName: d.name, role: d.role, phone: d.phone };
+            const demoProfile = {
+                id: d.uid, email, name: d.name,
+                fullName: d.name, role: d.role,
+                user_type: d.role.toLowerCase(),
+                phone: d.phone, profilePhoto: '',
+            };
             setUser(demoUser);
             setProfile(demoProfile);
             localStorage.setItem('demo_session', JSON.stringify({ user: demoUser, profile: demoProfile }));
             return { user: demoUser, profile: demoProfile };
         }
 
-        // Real backend login
         const { data } = await apiService.login(email, password);
         setStoredToken(data.token);
-        setUser({ uid: data.profile.id, email: data.profile.email });
-        setProfile(data.profile);
+        const p = data.profile;
+        setUser({ uid: p.id, email: p.email });
+        setProfile(p);
         return data;
     }, []);
 
-    // ── Signup ─────────────────────────────────────────────────────────
-    const signup = useCallback(async ({ email, password, fullName, role, phone }) => {
-        const { data } = await apiService.signup({ email, password, fullName, role, phone });
+    const signup = useCallback(async (payload) => {
+        const { data } = await apiService.signup(payload);
         setStoredToken(data.token);
-        setUser({ uid: data.profile.id, email: data.profile.email });
-        setProfile(data.profile);
+        const p = data.profile;
+        setUser({ uid: p.id, email: p.email });
+        setProfile(p);
         return data;
     }, []);
 
-    // ── Sign Out ───────────────────────────────────────────────────────
-    const signOut = useCallback(async () => {
+    const signOut = useCallback(() => {
         setStoredToken(null);
         localStorage.removeItem('demo_session');
         localStorage.removeItem('parksaathi_session');
@@ -83,21 +86,42 @@ export const AuthProvider = ({ children }) => {
         setProfile(null);
     }, []);
 
-    // ── Update Profile ─────────────────────────────────────────────────
     const updateProfile = useCallback(async (updates) => {
         const id = user?.uid || profile?.id;
         if (!id) return;
-        try {
-            const { data } = await apiService.updateProfile(id, updates);
-            setProfile(data);
-        } catch (err) {
-            console.error('Failed to update profile:', err.message);
+
+        // For demo users, update locally
+        const isDemo = id === 'demo-driver-001' || id === 'demo-owner-001';
+        const updated = { ...profile, ...updates };
+        setProfile(updated);
+
+        if (!isDemo) {
+            try {
+                const { data } = await apiService.updateProfile(id, updates);
+                setProfile(data.profile);
+            } catch (err) {
+                console.error('Profile update failed:', err.message);
+            }
         }
     }, [user, profile]);
 
-    // ── Refresh profile from server ────────────────────────────────────
+    // Effect to listen for 401 errors from API interceptor
+    useEffect(() => {
+        const check = setInterval(() => {
+            const token = getStoredToken();
+            if (!token && (user || profile)) {
+                signOut();
+            }
+        }, 5000);
+        return () => clearInterval(check);
+    }, [user, profile, signOut]);
+
     const refreshProfile = useCallback(async () => {
         if (!getStoredToken()) return;
+
+        const demo = localStorage.getItem('demo_session');
+        if (demo) return;
+
         try {
             const { data } = await apiService.getProfile();
             setProfile(data.profile);
@@ -108,7 +132,7 @@ export const AuthProvider = ({ children }) => {
         <AuthContext.Provider value={{
             user, profile, loading,
             login, signup, signOut, updateProfile, refreshProfile,
-            // Legacy aliases kept for backward-compat with existing pages
+            // No-op legacy aliases
             loginWithPhone: () => Promise.resolve(),
             sendOtp:        () => Promise.resolve(),
             verifyOtp:      () => Promise.resolve(),

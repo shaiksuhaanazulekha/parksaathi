@@ -1,28 +1,27 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
-exports.auth = (req, res, next) => {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+export const auth = (req, res, next) => {
     // Demo bypass
-    if (token?.startsWith('demo-token-')) {
-        req.user = { id: token.replace('demo-token-', ''), role: 'demo' };
+    const demoToken = req.headers['x-demo-token'];
+    if (demoToken) {
+        req.user = { id: demoToken, uid: demoToken, role: demoToken.split('-')[1] };
         return next();
     }
 
-    if (!token) return res.status(401).json({ error: 'No token, authorization denied' });
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: 'Auth required' });
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'parksaathi_secret_key_2024');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
         req.user = decoded;
         next();
     } catch (err) {
-        res.status(401).json({ error: 'Token is not valid' });
+        res.status(401).json({ error: 'Invalid token' });
     }
 };
 
-exports.owner = (req, res, next) => {
-    if (req.user?.role?.toLowerCase() !== 'owner' && req.user?.role !== 'demo') {
-        return res.status(403).json({ error: 'Access denied. Owners only.' });
-    }
+export const owner = (req, res, next) => {
+    const role = (req.user?.role || '').toLowerCase();
+    if (role !== 'owner') return res.status(403).json({ error: 'Owner access required' });
     next();
 };

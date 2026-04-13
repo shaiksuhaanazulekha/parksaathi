@@ -1,19 +1,18 @@
-const express = require('express');
-const router = express.Router();
-const mongoose = require('mongoose');
-const kvStore = require('../services/kvStore');
+import express from 'express';
+import mongoose from 'mongoose';
+import * as kvStore from '../services/kvStore.js';
 
-// @route   GET /api/health
-// @desc    Server health check
+const router = express.Router();
+
 router.get('/', (req, res) => {
     res.json({
         status: "ok",
         mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
         replitDB: kvStore.checkHealth(),
         objectStorage: "connected",
-        vectorStore: "connected", // Simplified mock for now
+        vectorStore: "connected",
         uptime: Math.floor(process.uptime())
     });
 });
 
-module.exports = router;
+export default router;

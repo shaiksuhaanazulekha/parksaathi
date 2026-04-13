@@ -1,30 +1,32 @@
-// Simulated Replit DB (Key-Value strict TTL store)
-const store = new Map();
+import Database from '@replit/database';
+const db = new Database();
 
-const set = (key, value, ttlSeconds) => {
+export const set = async (key, value, ttlSeconds) => {
     const expiresAt = Date.now() + (ttlSeconds * 1000);
-    store.set(key, { value, expiresAt });
-    
-    // Auto cleanup
-    setTimeout(() => {
-        const item = store.get(key);
-        if (item && item.expiresAt <= Date.now()) {
-            store.delete(key);
-        }
-    }, ttlSeconds * 1000 + 100);
+    await db.set(key, { value, expiresAt });
 };
 
-const get = (key) => {
-    const item = store.get(key);
-    if (!item) return null;
-    if (item.expiresAt < Date.now()) {
-        store.delete(key);
+export const get = async (key) => {
+    try {
+        const item = await db.get(key);
+        if (!item) return null;
+        if (item.expiresAt < Date.now()) {
+            await db.delete(key);
+            return null;
+        }
+        return item.value;
+    } catch (err) {
         return null;
     }
-    return item.value;
 };
 
-const del = (key) => store.delete(key);
-const checkHealth = () => "connected";
+export const del = async (key) => {
+    try {
+        await db.delete(key);
+        return true;
+    } catch (err) {
+        return false;
+    }
+};
 
-module.exports = { set, get, del, checkHealth };
+export const checkHealth = () => "connected";

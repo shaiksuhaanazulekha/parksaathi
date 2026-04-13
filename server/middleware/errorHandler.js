@@ -1,13 +1,12 @@
-const errorHandler = (err, req, res, next) => {
-    console.error(err.stack);
-
-    const status = err.statusCode || 500;
-    const message = err.message || 'Something went wrong on the server';
-
-    res.status(status).json({
+export const errorHandler = (err, req, res, next) => {
+    console.error('🔥 Error:', err.stack);
+    
+    const statusCode = err.statusCode || 500;
+    const message = err.message || 'Internal Server Error';
+    
+    res.status(statusCode).json({
+        success: false,
         error: message,
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        stack: process.env.NODE_ENV === 'production' ? null : err.stack
     });
 };
-
-module.exports = { errorHandler };

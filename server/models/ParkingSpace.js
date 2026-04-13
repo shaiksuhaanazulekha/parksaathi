@@ -1,53 +1,50 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const parkingSchema = new mongoose.Schema({
     ownerId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    name:        { type: String, required: true, trim: true },
-    description: { type: String, default: '' },
-    type:        { type: String, enum: ['driveway', 'society', 'commercial', 'open'], default: 'driveway' },
-    vehicles:    [{ type: String, enum: ['car', 'bike'] }],
+    name:        { type: String, required: true },
+    description: String,
     address:     { type: String, required: true },
     city:        { type: String, required: true },
     area:        { type: String, required: true },
-    coordinates: {
-        lat: { type: Number, required: true },
-        lng: { type: Number, required: true }
-    },
-    photos: [{ 
-        filename: String, 
-        url: String,
-        size: Number
+    type:        { type: String, enum: ['driveway', 'society', 'commercial', 'open'], default: 'driveway' },
+    vehicles:    [{ type: String, enum: ['car', 'bike'] }],
+    capacity:    { type: Number, default: 1 },
+    photos:      [{
+        url:      String,
+        filename: String,
+        size:     Number
     }],
     amenities: {
-        covered: { type: Boolean, default: false },
-        cctv:    { type: Boolean, default: false },
+        covered:       { type: Boolean, default: false },
+        cctv:          { type: Boolean, default: false },
         available24x7: { type: Boolean, default: true },
-        lighting: { type: Boolean, default: false },
-        washArea: { type: Boolean, default: false }
+        lighting:      { type: Boolean, default: true },
+        washArea:      { type: Boolean, default: false }
     },
-    capacity: { type: Number, default: 1 },
+    pricing: {
+        basePrice:          { type: Number, required: true }, // Hourly
+        peakPricingEnabled: { type: Boolean, default: true }
+    },
+    cityPricing: {
+        min: Number,
+        max: Number,
+        avg: Number,
+        zone: String
+    },
     availability: {
-        days:      [{ type: String }], // ["Mon", "Tue"...]
+        days:      [{ type: String }],
         startTime: { type: String, default: '00:00' },
         endTime:   { type: String, default: '23:59' }
     },
-    pricing: {
-        basePrice:          { type: Number, required: true },
-        peakPricingEnabled: { type: Boolean, default: true },
-        peakMultiplier:     { type: Number, default: 1.3 },
-        peakHours:          [{ type: String }], // ["08:00-10:00", "17:00-20:00"]
-        weeklyDiscount:     { type: Number, default: 0.15 },
-        monthlyDiscount:    { type: Number, default: 0.25 }
+    coordinates: {
+        lat: Number,
+        lng: Number
     },
-    cityPricing: {
-        min: Number, max: Number, avg: Number, zone: String
-    },
-    rating:        { type: Number, default: 0 },
-    reviewCount:   { type: Number, default: 0 },
-    totalBookings: { type: Number, default: 0 },
-    status:        { type: String, enum: ['live', 'paused', 'draft'], default: 'live' },
+    status: { type: String, enum: ['live', 'paused', 'deleted'], default: 'live' },
+    rating: { type: Number, default: 4.5 },
     blockedSlots: [{
-        date: String, // YYYY-MM-DD
+        date:      String,
         startTime: String,
         endTime:   String,
         reason:    String
@@ -64,4 +61,4 @@ const parkingSchema = new mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model('ParkingSpace', parkingSchema);
+export default mongoose.model('ParkingSpace', parkingSchema);

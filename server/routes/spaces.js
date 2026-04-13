@@ -1,19 +1,19 @@
-const express = require('express');
-const router = express.Router();
-const ParkingSpace = require('../models/ParkingSpace');
-const City = require('../models/City');
-const Booking = require('../models/Booking');
-const { auth, owner } = require('../middleware/auth');
-const { getSurge } = require('../utils/pricing');
+import express from 'express';
+import ParkingSpace from '../models/ParkingSpace.js';
+import Booking from '../models/Booking.js';
+import City from '../models/City.js';
+import { auth, owner } from '../middleware/auth.js';
 
-// GET /api/spots (renamed to plural for consistency)
+const router = express.Router();
+
+// GET /api/spaces
 router.get('/', async (req, res) => {
     try {
         const { city, area } = req.query;
-        let query = { status: 'live' };
+        const query = { status: 'live' };
         if (city) query.city = city;
         if (area) query.area = area;
-        
+
         const spaces = await ParkingSpace.find(query).lean();
         res.json(spaces);
     } catch (err) {
@@ -26,43 +26,14 @@ router.get('/:id', async (req, res) => {
     try {
         const space = await ParkingSpace.findById(req.params.id).lean();
         if (!space) return res.status(404).json({ error: 'Space not found' });
-        res.json(space);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// GET /api/spaces/owner
-router.get('/owner/list', auth, owner, async (req, res) => {
-    try {
-        const spaces = await ParkingSpace.find({ ownerId: req.user.uid || req.user.id }).lean();
-        res.json(spaces);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// GET /api/spaces/:id/slots
-router.get('/:id/slots', async (req, res) => {
-    const { date } = req.query;
-    const { id } = req.params;
-    
-    try {
-        const space = await ParkingSpace.findById(id).lean();
-        const bookings = await Booking.find({ spaceId: id, date, status: { $ne: 'cancelled' } }).lean();
-        const bookedHours = bookings.map(b => b.startTime);
-
-        const available = [];
-        const surge = [];
         
-        for (let i = 8; i < 22; i++) {
-            const time = `${i.toString().padStart(2, '0')}:00`;
-            if (!bookedHours.includes(time)) {
-                available.push(time);
-                if (getSurge(date, time).isSurge) surge.push(time);
-            }
-        }
-        res.json({ available, booked: bookedHours, surge });
+        // Get booked slots for the next 7 days
+        const bookings = await Booking.find({ 
+            spaceId: req.params.id, 
+            status: { $ne: 'cancelled' } 
+        }).select('date startTime duration status').lean();
+
+        res.json({ ...space, bookedSlots: bookings });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -89,7 +60,6 @@ router.post('/', auth, owner, async (req, res) => {
 router.get('/search', async (req, res) => {
     try {
         const { q, lat, lng } = req.query;
-        // Simplified vector search mock using text index or regex
         const query = { status: 'live' };
         if (q) {
             query.$or = [
@@ -123,7 +93,7 @@ router.post('/:id/block-slot', auth, owner, async (req, res) => {
 // DELETE /api/spaces/:id/block-slot
 router.delete('/:id/block-slot', auth, owner, async (req, res) => {
     try {
-        const { date, startTime } = req.body; // In REST, body in DELETE is tricky, often query is used, but following test req
+        const { date, startTime } = req.body;
         const space = await ParkingSpace.findOneAndUpdate(
             { _id: req.params.id, ownerId: req.user.uid || req.user.id },
             { $pull: { blockedSlots: { date, startTime } } },
@@ -171,4 +141,4 @@ router.delete('/:id', auth, owner, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

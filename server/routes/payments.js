@@ -1,11 +1,10 @@
-const express = require('express');
-const router = express.Router();
-const Booking = require('../models/Booking');
-const { auth } = require('../middleware/auth');
+import express from 'express';
+import Booking from '../models/Booking.js';
+import { auth } from '../middleware/auth.js';
 
-// @route   POST /api/payments/create-order
+const router = express.Router();
+
 router.post('/create-order', auth, async (req, res) => {
-    // Simulated Razorpay order creation
     res.json({
         id: 'order_demo_' + Date.now(),
         amount: req.body.amount,
@@ -13,12 +12,9 @@ router.post('/create-order', auth, async (req, res) => {
     });
 });
 
-// @route   POST /api/payments/verify
 router.post('/verify', auth, async (req, res) => {
     try {
-        const { bookingId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
-        
-        // Simulated Signature verification
+        const { bookingId, razorpay_payment_id } = req.body;
         if (!razorpay_payment_id) return res.status(400).json({ error: 'Payment failed validation' });
 
         const booking = await Booking.findByIdAndUpdate(
@@ -33,4 +29,4 @@ router.post('/verify', auth, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

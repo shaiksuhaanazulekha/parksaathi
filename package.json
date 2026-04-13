@@ -1,0 +1,15 @@
+{
+  "name": "parksaathi-monorepo",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run server --prefix server\" \"npm run dev --prefix client\"",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "build": "cd client && npm install && npm run build",
+    "start": "node server/index.js",
+    "seed": "node server/seed_v2.js"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

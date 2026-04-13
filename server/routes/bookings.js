@@ -1,31 +1,32 @@
-const express = require('express');
+import express from 'express';
+import Booking from '../models/Booking.js';
+import ParkingSpace from '../models/ParkingSpace.js';
+import Coupon from '../models/Coupon.js';
+import Notification from '../models/Notification.js';
+import { auth } from '../middleware/auth.js';
+import { getSurgePricing, applyPricing, applyCoupon } from '../utils/pricing.js';
+import * as kvStore from '../services/kvStore.js';
+
 const router = express.Router();
-const Booking = require('../models/Booking');
-const ParkingSpace = require('../models/ParkingSpace');
-const Coupon = require('../models/Coupon');
-const Notification = require('../models/Notification');
-const { auth } = require('../middleware/auth');
-const { getSurge } = require('../utils/pricing');
-const kvStore = require('../services/kvStore');
 
 // @route   POST /api/bookings
 router.post('/', auth, async (req, res) => {
     try {
-        const { spaceId, date, startTime, duration, coupon } = req.body;
+        const { spaceId, date, startTime, duration, couponCode } = req.body;
         const driverId = req.user.uid || req.user.id;
         
         // Concurrency Check (TEST 3.2, 3.6)
         const lockKey = `slot:lock:${spaceId}:${date}:${startTime}`;
-        const existingLock = kvStore.get(lockKey);
+        const existingLock = await kvStore.get(lockKey);
         if (existingLock && existingLock !== driverId) {
             return res.status(409).json({ error: 'Slot is currently being booked by someone else' });
         }
-        kvStore.set(lockKey, driverId, 30); // 30s TTL lock
+        await kvStore.set(lockKey, driverId, 30); // 30s TTL lock
 
         // Check if already booked in DB
         const overlap = await Booking.findOne({ spaceId, date, startTime, status: { $ne: 'cancelled' }});
         if (overlap) {
-            kvStore.del(lockKey);
+            await kvStore.del(lockKey);
             return res.status(409).json({ error: 'Slot already booked' });
         }
 
@@ -33,35 +34,22 @@ router.post('/', auth, async (req, res) => {
         if (!space) return res.status(404).json({ error: 'Space not found' });
         if (space.ownerId.toString() === driverId) return res.status(403).json({ error: 'Cannot book own space' });
 
-        const surge = getSurge(date, startTime);
+        const surgeData = await getSurgePricing();
+        const pricing = applyPricing(space.pricing.basePrice, surgeData, space.amenities);
         
-        let baseRate = space.pricing.basePrice;
-        let subtotal = baseRate * duration * surge.multiplier;
-        if (space.amenities.covered) subtotal += (10 * duration);
-        
-        let platformFee = subtotal * 0.1;
-        let totalAmount = subtotal + platformFee;
-        
-        let discount = 0;
-        if (coupon) {
-            const cp = await Coupon.findOne({ code: coupon, isActive: true });
-            if (!cp) return res.status(400).json({ error: 'Invalid coupon' });
-            
-            if (cp.conditions?.firstBookingOnly) {
-                const past = await Booking.countDocuments({ driverId });
-                if (past > 0) return res.status(400).json({ error: 'Already used' });
-            }
-            if (cp.conditions?.weekendOnly) {
-                const d = new Date(date);
-                if (d.getDay() !== 0 && d.getDay() !== 6) return res.status(400).json({ error: 'Valid on weekends only' });
-            }
-            
-            discount = cp.type === 'flat' ? cp.value : (totalAmount * (cp.value/100));
-            discount = Math.min(discount, cp.maxDiscount);
-            totalAmount -= discount;
+        let finalAmount = pricing.total;
+        let discountInfo = { valid: false };
 
-            cp.usedBy.push(driverId);
-            await cp.save();
+        if (couponCode) {
+            const isFirst = (await Booking.countDocuments({ driverId })) === 0;
+            const d = new Date(date);
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            const isMonthly = duration >= 720; // 30 days * 24 hours approx
+
+            discountInfo = applyCoupon(pricing.total, couponCode, isFirst, isWeekend, isMonthly);
+            if (discountInfo.valid) {
+                 finalAmount = discountInfo.finalTotal;
+            }
         }
 
         const booking = await Booking.create({
@@ -69,20 +57,29 @@ router.post('/', auth, async (req, res) => {
             date, startTime, duration,
             endTime: `${(parseInt(startTime.split(':')[0]) + duration).toString().padStart(2, '0')}:00`,
             pricing: {
-                baseRate, surgeMultiplier: surge.multiplier,
-                coveredPremium: space.amenities.covered ? 10 : 0,
-                subtotal, platformFee, couponCode: coupon, couponDiscount: discount,
-                totalAmount: Math.round(totalAmount)
+                baseRate: pricing.basePrice,
+                surgeMultiplier: pricing.surgeMultiplier,
+                coveredPremium: pricing.coveredPremium,
+                subtotal: pricing.subtotal,
+                platformFee: pricing.platformFee,
+                couponCode: discountInfo.valid ? couponCode : null,
+                couponDiscount: discountInfo.valid ? discountInfo.discount : 0,
+                totalAmount: Math.round(finalAmount)
             },
-            status: 'pending' // Pending owner acceptance/payment
+            status: 'pending' 
         });
 
-        kvStore.del(lockKey);
+        await kvStore.del(lockKey);
 
         const io = req.app.get('io');
         if (io) io.to(space.ownerId.toString()).emit('owner:new_booking_request', booking);
 
-        res.status(201).json({ bookingId: booking._id, totalAmount: Math.round(totalAmount), status: 'pending' });
+        res.status(201).json({ 
+            bookingId: booking._id, 
+            totalAmount: Math.round(finalAmount), 
+            status: 'pending',
+            coupon: discountInfo.valid ? { code: couponCode, discount: discountInfo.discount, message: discountInfo.message } : null
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -187,4 +184,4 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

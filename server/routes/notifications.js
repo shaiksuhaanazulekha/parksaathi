@@ -1,22 +1,21 @@
-const express = require('express');
-const router = express.Router();
-const Notification = require('../models/Notification');
-const { auth } = require('../middleware/auth');
+import express from 'express';
+import Notification from '../models/Notification.js';
+import { auth } from '../middleware/auth.js';
 
-// @route   GET /api/notifications
+const router = express.Router();
+
 router.get('/', auth, async (req, res) => {
     try {
-        const n = await Notification.find({ userId: req.user.uid || req.user.id })
+        const notifications = await Notification.find({ userId: req.user.uid || req.user.id })
             .sort({ createdAt: -1 })
-            .lean();
-        res.json(n);
+            .limit(50);
+        res.json(notifications);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// @route   PATCH /api/notifications/:id/read
-router.patch('/:id/read', auth, async (req, res) => {
+router.put('/:id/read', auth, async (req, res) => {
     try {
         await Notification.findByIdAndUpdate(req.params.id, { isRead: true });
         res.json({ success: true });
@@ -25,4 +24,4 @@ router.patch('/:id/read', auth, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

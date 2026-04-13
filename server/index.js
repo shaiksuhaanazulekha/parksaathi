@@ -1,11 +1,28 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const path = require('path');
-const http = require('http');
-const { Server } = require('socket.io');
-const rateLimit = require('express-rate-limit');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import http from 'http';
+import { Server } from 'socket.io';
+import rateLimit from 'express-rate-limit';
+
+// Routes
+import authRoutes from './routes/auth.js';
+import spaceRoutes from './routes/spaces.js';
+import bookingRoutes from './routes/bookings.js';
+import uploadRoutes from './routes/upload.js';
+import citiesRoutes from './routes/cities.js';
+import notifRoutes from './routes/notifications.js';
+import paymentRoutes from './routes/payments.js';
+import healthRoutes from './routes/health.js';
+
+// Middleware
+import { errorHandler } from './middleware/errorHandler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -25,7 +42,7 @@ app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.set('trust proxy', 1);
 
-// Rate Limiting (TEST 7)
+// Rate Limiting
 const limiter = rateLimit({ windowMs: 60 * 1000, max: 100, message: { error: 'Too Many Requests' } });
 app.use(limiter);
 
@@ -34,16 +51,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Make IO globally accessible
 app.set('io', io);
 
-// Routes
-const authRoutes = require('./routes/auth');
-const spaceRoutes = require('./routes/spaces');
-const bookingRoutes = require('./routes/bookings');
-const uploadRoutes = require('./routes/upload');
-const citiesRoutes = require('./routes/cities');
-const notifRoutes = require('./routes/notifications');
-const paymentRoutes = require('./routes/payments');
-const healthRoutes = require('./routes/health');
-
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/spaces', spaceRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -53,7 +61,7 @@ app.use('/api/notifications', notifRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/health', healthRoutes);
 
-// Compatibility Aliases (for old frontend calls)
+// Compatibility Aliases
 app.use('/api/spots', spaceRoutes); 
 app.use('/api/pricing', citiesRoutes);
 
@@ -62,11 +70,13 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.log('⚠️  MongoDB connection error:', err.message));
 
-// Error Handler
-const { errorHandler } = require('./middleware/errorHandler');
 app.use(errorHandler);
 
-server.listen(PORT, () => {
-    console.log(`\n🚗 ParkSaathi API running on http://localhost:${PORT}`);
-    console.log(`🖼️  Static uploads served at http://localhost:${PORT}/uploads`);
-});
+// Only listen if not in a serverless environment (Vercel)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    server.listen(PORT, () => {
+        console.log(`\n🚗 ParkSaathi API running on http://localhost:${PORT}`);
+    });
+}
+
+export default app;

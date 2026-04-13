@@ -16,6 +16,7 @@ import OwnerDashboard from './pages/OwnerDashboard';
 import Notifications from './pages/Notifications';
 import Payment from './pages/Payment';
 import ManageSlots from './pages/ManageSlots';
+import AllSpaces from './pages/AllSpaces';
 
 // Components
 import Navbar from './components/Navbar';
@@ -24,8 +25,8 @@ const ProtectedRoute = ({ children, role }) => {
     const { user, profile, loading } = useAuth();
     if (loading) return null;
     if (!user) return <Navigate to="/login" replace />;
-    if (role && (profile?.role || '').toLowerCase() !== role.toLowerCase()) {
-        return <Navigate to="/dashboard" replace />;
+    if (role && (profile?.role || profile?.user_type || '').toLowerCase() !== role.toLowerCase()) {
+        return <Navigate to="/profile" replace />;
     }
     return children;
 };
@@ -54,6 +55,7 @@ const AppRoutes = () => {
                     
                     <Route path="/booking/:id" element={<ProtectedRoute><Booking /></ProtectedRoute>} />
                     <Route path="/owner/list-spot" element={<ProtectedRoute role="Owner"><ListSpot /></ProtectedRoute>} />
+                    <Route path="/owner/all-spaces" element={<ProtectedRoute role="Owner"><AllSpaces /></ProtectedRoute>} />
                     <Route path="/owner/manage-slots/:id" element={<ProtectedRoute role="Owner"><ManageSlots /></ProtectedRoute>} />
                     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                     <Route path="/bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />

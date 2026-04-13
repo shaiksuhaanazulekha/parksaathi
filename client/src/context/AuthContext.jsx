@@ -31,10 +31,13 @@ export const AuthProvider = ({ children }) => {
                     const p = data.profile;
                     setUser({ uid: p.id, email: p.email });
                     setProfile(p);
-            } catch (err) {
-                console.error('Session restoration failed:', err);
-                setStoredToken(null);
-            } finally {
+                } catch (err) {
+                    console.error('Session restoration failed:', err);
+                    setStoredToken(null);
+                } finally {
+                    setLoading(false);
+                }
+            } else {
                 setLoading(false);
             }
         };
@@ -62,7 +65,7 @@ export const AuthProvider = ({ children }) => {
             return { user: demoUser, profile: demoProfile };
         }
 
-        const { data } = await apiService.login(email, password);
+        const { data } = await apiService.login({ email, password });
         setStoredToken(data.token);
         const p = data.profile;
         setUser({ uid: p.id, email: p.email });
@@ -110,7 +113,8 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const check = setInterval(() => {
             const token = getStoredToken();
-            if (!token && (user || profile)) {
+            const isDemo = localStorage.getItem('demo_session');
+            if (!token && !isDemo && (user || profile)) {
                 signOut();
             }
         }, 5000);

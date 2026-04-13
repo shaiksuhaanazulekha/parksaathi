@@ -59,9 +59,13 @@ const Booking = () => {
                 startTime,
                 duration,
                 coupon: couponApplied?.code,
-                paymentMethod: 'upi'
+                paymentMethod: 'upi',
+                totalAmount: calculatePricing().total // Pass calculated price
             });
-            setConfirmed(res.data);
+            setConfirmed({
+               bookingId: res.data._id,
+               totalAmount: res.data.pricing.totalAmount || calculatePricing().total
+            });
         } catch (err) { alert(err.message); }
         finally { setSubmitting(false); }
     };
@@ -107,25 +111,27 @@ const Booking = () => {
         </div>
     );
 
+    useEffect(() => {
+        if (confirmed) {
+            const timer = setTimeout(() => {
+                navigate('/bookings');
+            }, 3000); // 3s Auto-Loop
+            return () => clearTimeout(timer);
+        }
+    }, [confirmed, navigate]);
+
     if (confirmed) return (
         <div className="min-h-screen bg-park-dark text-white p-8 flex flex-col items-center justify-center text-center">
              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-2xl shadow-emerald-500/40">
                 <CheckCircle2 size={48} />
              </motion.div>
-             <h1 className="text-3xl font-black font-outfit mb-2">Booking Confirmed! 🎉</h1>
-             <p className="text-white/50 text-sm mb-10">Monospace ID: <span className="font-mono text-white tracking-widest">{confirmed.bookingId}</span></p>
+             <h1 className="text-3xl font-black font-outfit mb-2">Success! 🎉</h1>
+             <p className="text-white/50 text-[10px] font-black uppercase tracking-[3px] mb-10 italic">ID: #{confirmed.bookingId}</p>
              
-             <div className="w-full bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-left mb-10">
-                <h3 className="font-bold text-white mb-4 flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full" /> {spot.name}</h3>
+             <div className="w-full bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-left mb-10 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-4 bg-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase tracking-widest">Confirmed</div>
+                <h3 className="font-bold text-white mb-4 flex items-center gap-2">{spot.name}</h3>
                 <div className="space-y-3">
-                    <div className="flex justify-between text-xs">
-                        <span className="text-white/40 font-bold uppercase">Date & Time</span>
-                        <span className="font-black">{new Date(selectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, {startTime}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                        <span className="text-white/40 font-bold uppercase">Duration</span>
-                        <span className="font-black">{duration} Hour{duration > 1 ? 's' : ''}</span>
-                    </div>
                     <div className="flex justify-between text-xs">
                         <span className="text-white/40 font-bold uppercase">Amount Paid</span>
                         <span className="font-black text-emerald-400">₹{confirmed.totalAmount}</span>
@@ -134,18 +140,18 @@ const Booking = () => {
              </div>
 
              <div className="w-full space-y-3">
-                <button className="w-full py-4 bg-park-primary rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl">
-                    <Calendar size={18} /> Add to Calendar
+                <button 
+                  onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`, '_blank')}
+                  className="w-full py-4.5 bg-blue-600 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20"
+                >
+                    <Navigation size={18} /> Start Navigation
                 </button>
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.coordinates?.lat},${spot.coordinates?.lng}`, '_blank')} className="py-4 bg-white/10 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2">
-                        <Navigation size={16} /> Navigate
-                    </button>
-                    <button className="py-4 bg-white/10 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2">
-                        <Share2 size={16} /> Share
-                    </button>
-                </div>
-                <button onClick={() => navigate('/dashboard')} className="w-full py-4 text-white/40 font-bold text-sm">Back to Home</button>
+                <button 
+                  onClick={() => navigate('/bookings')}
+                  className="w-full py-4 text-white/40 font-bold text-xs uppercase tracking-widest"
+                >
+                    Redirecting to Tracker in 3s...
+                </button>
              </div>
         </div>
     );

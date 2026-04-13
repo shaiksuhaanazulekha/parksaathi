@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Star, MapPin, Navigation as NavIcon } from 'lucide-react';
+import { Star, MapPin, Navigation as NavIcon, ShieldCheck } from 'lucide-react';
 import apiService from '../services/api';
 
 // Fix Vite/Webpack bundling issue with Leaflet default icons
@@ -13,7 +13,7 @@ L.Icon.Default.mergeOptions({
     shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const createPriceIcon = (price, selected) => L.divIcon({
+const createPriceIcon = (price, selected, isNew) => L.divIcon({
     className: '',
     html: `<div style="
         background: ${selected ? '#1e3a8a' : '#10b981'};
@@ -30,7 +30,10 @@ const createPriceIcon = (price, selected) => L.divIcon({
         transform: translate(-50%, -100%);
         position: absolute;
         transition: all 0.2s;
-    ">₹${price}</div>`,
+    ">
+        ₹${price}
+        ${isNew ? '<span style="position: absolute; top: -10px; right: -10px; background: #ef4444; color: white; font-size: 8px; padding: 2px 5px; border-radius: 6px; border: 1.5px solid white; animation: bounce 1s infinite;">NEW</span>' : ''}
+    </div>`,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
 });
@@ -54,28 +57,9 @@ const DEMO_SPOTS = [
 const DEFAULT_CENTER = { lat: 17.4483, lng: 78.3915 };
 const FALLBACK_IMG   = 'https://images.unsplash.com/photo-1590674899484-13da0d1b58f5?w=400&auto=format';
 
-const MapView = ({ onSpotSelect }) => {
-    const [spots, setSpots]           = useState([]);
+const MapView = ({ spots = [], onSelect }) => {
     const [center, setCenter]         = useState(DEFAULT_CENTER);
     const [selectedSpot, setSelectedSpot] = useState(null);
-    const [loading, setLoading]       = useState(true);
-
-    // Load spots from API
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const { data } = await apiService.getSpots({ lat: DEFAULT_CENTER.lat, lng: DEFAULT_CENTER.lng });
-                const valid = (data || []).filter(s => s.lat && s.lng);
-                setSpots(valid.length > 0 ? valid : DEMO_SPOTS);
-                if (valid.length > 0) setCenter({ lat: valid[0].lat, lng: valid[0].lng });
-            } catch {
-                setSpots(DEMO_SPOTS);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
-    }, []);
 
     // Get user location
     useEffect(() => {
@@ -85,11 +69,9 @@ const MapView = ({ onSpotSelect }) => {
         );
     }, []);
 
-    if (loading) return (
-        <div className="h-full w-full bg-gray-100 flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-park-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-    );
+    const handleSpotSelect = (spot) => {
+        if (onSelect) onSelect(spot);
+    };
 
     return (
         <div className="h-full w-full relative">
@@ -108,15 +90,16 @@ const MapView = ({ onSpotSelect }) => {
 
                 {spots.map(spot => (
                     <Marker
-                        key={spot.id || spot._id}
+                        key={`${spot._id}-${spot.pricing?.basePrice || spot.pricePerHour}`}
                         position={[spot.lat, spot.lng]}
                         icon={createPriceIcon(
-                            spot.pricePerHour || spot.hourly_rate || '?',
-                            selectedSpot?.id === spot.id || selectedSpot?._id === spot._id
+                            spot.pricing?.basePrice || spot.pricePerHour || spot.hourly_rate || '?',
+                            selectedSpot?._id === spot._id,
+                            spot._id.startsWith('s17')
                         )}
                         eventHandlers={{ click: () => setSelectedSpot(spot) }}
                     >
-                        {(selectedSpot?.id === spot.id || selectedSpot?._id === spot._id) && (
+                        {(selectedSpot?._id === spot._id) && (
                             <Popup
                                 position={[spot.lat, spot.lng]}
                                 onClose={() => setSelectedSpot(null)}
@@ -141,26 +124,22 @@ const MapView = ({ onSpotSelect }) => {
                                     <p className="text-[11px] text-gray-500 flex items-center gap-1 mb-3">
                                         <MapPin size={10} className="text-park-primary shrink-0" /> {spot.address}
                                     </p>
-                                    <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                                        <span className="text-park-primary font-black text-sm">
-                                            ₹{spot.pricePerHour || spot.hourly_rate}
-                                            <span className="text-[10px] text-gray-400 font-normal">/hr</span>
-                                        </span>
+                                    <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-gray-100">
                                         <button
-                                            onClick={() => onSpotSelect(spot)}
-                                            className="bg-park-primary text-white text-[11px] px-3 py-1.5 rounded-xl font-bold shadow-md"
+                                            onClick={() => handleSpotSelect(spot)}
+                                            className="w-full bg-park-primary text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-park-primary/20 flex items-center justify-center gap-2"
                                         >
-                                            Reserve Now
+                                            <ShieldCheck size={14} /> Book This Spot
                                         </button>
+                                        <a
+                                            href={`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full bg-blue-600 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                                        >
+                                            <NavIcon size={14} fill="white" /> Start Navigation
+                                        </a>
                                     </div>
-                                    <a
-                                        href={`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="mt-2 w-full bg-blue-50 text-blue-600 text-[11px] py-1.5 rounded-xl font-bold flex items-center justify-center gap-1"
-                                    >
-                                        <NavIcon size={11} /> Directions
-                                    </a>
                                 </div>
                             </Popup>
                         )}

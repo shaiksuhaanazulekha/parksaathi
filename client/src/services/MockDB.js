@@ -1,130 +1,140 @@
-// --- 10,000+ Dynamic Global Spots Generator ---
-const MAJOR_CITIES = [
-    { name: 'Hyderabad', lat: 17.3850, lng: 78.4867 },
-    { name: 'Delhi', lat: 28.6139, lng: 77.2090 },
-    { name: 'Mumbai', lat: 19.0760, lng: 72.8777 },
-    { name: 'Bangalore', lat: 12.9716, lng: 77.5946 },
-    { name: 'Chennai', lat: 13.0827, lng: 80.2707 },
-    { name: 'Kolkata', lat: 22.5726, lng: 88.3639 },
-    { name: 'Pune', lat: 18.5204, lng: 73.8567 },
-    { name: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
-    { name: 'New York', lat: 40.7128, lng: -74.0060 },
-    { name: 'London', lat: 51.5074, lng: -0.1278 },
-    { name: 'Dubai', lat: 25.2048, lng: 55.2708 },
-    { name: 'Tokyo', lat: 35.6762, lng: 139.6503 },
-    { name: 'Singapore', lat: 1.3521, lng: 103.8198 },
-    { name: 'Paris', lat: 48.8566, lng: 2.3522 },
-    { name: 'Sydney', lat: -33.8688, lng: 151.2093 }
-];
+// Production-Grade Mock Database to ensure ParkSaathi works 100% offline or with server issues
+const STORAGE_KEY = 'parksaathi_db';
 
-const generateDiverseSpots = () => {
-    const list = [];
-    let idCounter = 100;
-
-    // Add original core spots first for consistency
-    list.push({ id: '1', name: 'Jubilee Hills P1', address: 'Plot 24, Road 36, Jubilee Hills', hourly_rate: 60, lat: 17.4483, lng: 78.3915, image_url: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=400', rating: 4.8, owner_id: 'o1', tags: ['luxury'] });
-
-    MAJOR_CITIES.forEach(city => {
-        // Generate ~700 spots per major city cluster = 10,500+ spots
-        for (let i = 0; i < 700; i++) {
-            const latOffset = (Math.random() - 0.5) * 0.2; // ~20km spread
-            const lngOffset = (Math.random() - 0.5) * 0.2;
-            list.push({
-                id: `gen-${idCounter++}`,
-                name: `${city.name} Smart Spot #${i + 1}`,
-                address: `Sector ${Math.floor(Math.random() * 100)}, ${city.name}`,
-                hourly_rate: 20 + Math.floor(Math.random() * 80),
-                lat: city.lat + latOffset,
-                lng: city.lng + lngOffset,
-                image_url: `https://images.unsplash.com/photo-${1500000000000 + (i % 500)}?w=400`,
-                rating: (4 + Math.random() * 1).toFixed(1),
-                owner_id: `o-gen-${Math.floor(i / 10)}`,
-                tags: ['instant', i % 5 === 0 ? 'ev-charging' : 'standard', i % 2 === 0 ? 'covered' : 'open']
-            });
+const INITIAL_DATA = {
+    users: [
+        { id: 'demo-u1', email: 'driver@demo.com', role: 'driver', name: 'Rahul Driver', wallet: 500 },
+        { id: 'demo-u2', email: 'owner@demo.com', role: 'owner', name: 'Priya Owner', wallet: 1000 }
+    ],
+    spaces: [
+        { 
+            _id: 's1', 
+            name: 'Kompally Parking Hub', 
+            area: 'Kompally', 
+            city: 'Hyderabad', 
+            pricing: { basePrice: 40 },
+            cityPricing: { avg: 55 },
+            status: 'live',
+            ownerId: 'demo-u2',
+            lat: 17.535,
+            lng: 78.4836,
+            photos: [{ url: 'https://images.unsplash.com/photo-1590674899484-13da0d1b58f5?w=400' }]
+        },
+        { 
+            _id: 's2', 
+            name: 'Jubilee Hills Spot', 
+            area: 'Jubilee Hills', 
+            city: 'Hyderabad', 
+            pricing: { basePrice: 60 },
+            cityPricing: { avg: 80 },
+            status: 'live',
+            ownerId: 'demo-u2',
+            lat: 17.4302,
+            lng: 78.4074,
+            photos: [{ url: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=400' }]
         }
-    });
-    return list;
+    ],
+    bookings: [
+        { _id: 'b1', spaceId: 's1', ownerId: 'demo-u2', driverId: 'demo-u1', date: '2024-04-13', startTime: '14:00', duration: 2, pricing: { totalAmount: 120 }, status: 'confirmed' }
+    ],
+    notifications: []
 };
 
-const STORAGE_KEY_SPOTS = 'parksaathi_spots';
-const STORAGE_KEY_BOOKINGS = 'parksaathi_bookings';
-const DEFAULT_SPOTS = generateDiverseSpots();
+const getDB = () => {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : INITIAL_DATA;
+};
 
-// Vector Search Simulation Helper
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
+const saveDB = (db) => localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
 
-export const MockDB = {
-    getSpots: async (filters = {}) => {
-        let spots = JSON.parse(localStorage.getItem(STORAGE_KEY_SPOTS));
-
-        // If local storage is empty or simulated "first run", use defaults
-        // Also if the count is low (from previous session), reload defaults to get 10k
-        if (!spots || spots.length < 100) {
-            spots = DEFAULT_SPOTS;
-            localStorage.setItem(STORAGE_KEY_SPOTS, JSON.stringify(spots));
-        }
-
-        if (filters.lat && filters.lng) {
-            spots = spots.map(spot => ({
-                ...spot,
-                distance: calculateDistance(filters.lat, filters.lng, spot.lat, spot.lng)
-            })).sort((a, b) => a.distance - b.distance);
-        }
-        if (filters.query) {
-            const q = filters.query.toLowerCase();
-            spots = spots.filter(s =>
-                s.name.toLowerCase().includes(q) ||
-                s.address.toLowerCase().includes(q) ||
-                s.tags.some(t => t.includes(q))
-            );
-        }
-        return spots.slice(0, 300); // Return top 300 nearest for performance
+export const mockApi = {
+    // Auth
+    login: (credentials) => {
+        const db = getDB();
+        const user = db.users.find(u => u.email === credentials.email);
+        if (user) return { data: { token: 'mock-jwt-token', profile: user } };
+        throw new Error('User not found in MockDB');
     },
 
-    getSpotById: async (id) => {
-        const spots = JSON.parse(localStorage.getItem(STORAGE_KEY_SPOTS)) || DEFAULT_SPOTS;
-        return spots.find(s => s.id === id);
+    // Spaces
+    getSpots: () => ({ data: [...getDB().spaces].reverse() }),
+    getSpot: (id) => ({ data: getDB().spaces.find(s => s._id === id) }),
+    getOwnerSpaces: () => {
+        const db = getDB();
+        return { data: [...db.spaces].reverse() };
     },
 
-    addSpot: async (spotData) => {
-        const spots = JSON.parse(localStorage.getItem(STORAGE_KEY_SPOTS)) || DEFAULT_SPOTS;
-        const newSpot = { ...spotData, id: Date.now().toString(), rating: '5.0' };
-        spots.push(newSpot);
-        localStorage.setItem(STORAGE_KEY_SPOTS, JSON.stringify(spots));
-        return newSpot;
+    createSpot: (data) => {
+        const db = getDB();
+        const basePrice = data.pricing?.basePrice || data.basePrice || 40;
+        const newSpot = {
+            _id: 's' + Date.now(),
+            ...data,
+            lat: data.lat || data.coordinates?.lat || 17.4483,
+            lng: data.lng || data.coordinates?.lng || 78.3915,
+            pricing: { ...data.pricing, basePrice },
+            ownerId: 'demo-u2',
+            status: 'live',
+            totalBookings: 0,
+            cityPricing: { avg: 50 },
+            rating: 4.8
+        };
+        db.spaces.push(newSpot);
+        saveDB(db);
+        return { data: newSpot };
     },
 
-    getBookings: async (userId) => {
-        const all = JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKINGS)) || [];
-        // We avoid fetching all 10k spots here to prevent perf issues, just map simple details if needed
-        // or just use what's stored in booking
-        return all.filter(b => b.driver_id === userId);
+    // Bookings
+    createBooking: (bookingData) => {
+        const db = getDB();
+        const space = db.spaces.find(s => s._id === bookingData.spaceId);
+        const newBooking = {
+            _id: 'b' + Date.now(),
+            ...bookingData,
+            ownerId: space.ownerId,
+            driverId: 'demo-u1',
+            status: 'pending',
+            pricing: { totalAmount: space.pricing.basePrice * bookingData.duration }
+        };
+        db.bookings.push(newBooking);
+        saveDB(db);
+        return { data: newBooking };
+    },
+    
+    getOwnerBookings: () => ({ data: [...getDB().bookings].reverse() }),
+    getDriverBookings: () => ({ data: [...getDB().bookings].reverse() }),
+
+    acceptBooking: (id) => {
+        const db = getDB();
+        const b = db.bookings.find(x => x._id === id);
+        if (b) b.status = 'confirmed';
+        saveDB(db);
+        return { data: b };
     },
 
-    createBooking: async (booking) => {
-        const all = JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKINGS)) || [];
-        const newBooking = { ...booking, id: 'BK' + Date.now(), status: 'Active', created_at: new Date() };
-        all.push(newBooking);
-        localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(all));
-        return newBooking;
+    declineBooking: (id) => {
+        const db = getDB();
+        const b = db.bookings.find(x => x._id === id);
+        if (b) b.status = 'cancelled';
+        saveDB(db);
+        return { data: b };
     },
 
-    getOwnerStats: async () => {
-        const allBookings = JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKINGS)) || [];
-        // Mock stats for demo
-        return {
-            totalEarnings: allBookings.reduce((sum, b) => sum + (b.amount || 0), 0),
-            activeBookings: allBookings.filter(b => b.status === 'Active').length,
-            spotViews: Math.floor(Math.random() * 5000) + 500
+    getNotifications: () => ({ data: getDB().notifications }),
+    getRecommendation: () => ({ data: [] }),
+    getSlots: (spaceId, date) => {
+        const db = getDB();
+        const baseSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
+        const bookedHours = db.bookings
+            .filter(b => b.spaceId === spaceId && b.date === date && b.status !== 'cancelled')
+            .map(b => b.startTime);
+            
+        return { 
+            data: { 
+                available: baseSlots.filter(s => !bookedHours.includes(s)), 
+                booked: bookedHours, 
+                surge: ['10:00', '11:00', '17:00', '18:00'] 
+            } 
         };
     }
 };

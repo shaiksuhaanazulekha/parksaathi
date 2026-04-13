@@ -32,10 +32,15 @@ const Home = () => {
           apiService.getSpots({ city: userCity, area: userArea }),
           apiService.getPricing(userCity, userArea)
         ]);
-        setSpots(spotsRes.data);
-        setCityData(cityRes.data);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+        
+        setSpots(Array.isArray(spotsRes?.data) ? spotsRes.data : []);
+        setCityData(cityRes?.data || { avg: 40 });
+      } catch (e) { 
+        console.error('Home data load failed:', e);
+        setSpots([]);
+      } finally { 
+        setLoading(false); 
+      }
     };
     loadData();
   }, [userCity, userArea, navigate]);

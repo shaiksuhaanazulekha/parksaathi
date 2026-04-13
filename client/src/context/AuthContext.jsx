@@ -31,11 +31,12 @@ export const AuthProvider = ({ children }) => {
                     const p = data.profile;
                     setUser({ uid: p.id, email: p.email });
                     setProfile(p);
-                } catch {
-                    setStoredToken(null);
-                }
+            } catch (err) {
+                console.error('Session restoration failed:', err);
+                setStoredToken(null);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         restore();
     }, []);

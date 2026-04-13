@@ -18,15 +18,29 @@ const OwnerDashboard = () => {
 
   useEffect(() => {
     const load = async () => {
+      // Prevent crash if profile is still loading
+      if (!profile) return;
+
       try {
         const [, spacesRes] = await Promise.all([
-          apiService.getRecommendation(profile?.location?.city || 'Hyderabad', profile?.location?.area || 'Banjara Hills'), // Mock stats logic
+          apiService.getRecommendation(profile?.location?.city || 'Hyderabad', profile?.location?.area || 'Banjara Hills'),
           apiService.getOwnerSpaces()
         ]);
-        setStats({ totalEarnings: 4850, activeBookings: 3, totalSpaces: spacesRes.data.length, spotViews: 142 });
-        setSpaces(spacesRes.data);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+        
+        const spacesData = Array.isArray(spacesRes?.data) ? spacesRes.data : [];
+        setStats({ 
+          totalEarnings: 4850, 
+          activeBookings: 3, 
+          totalSpaces: spacesData.length, 
+          spotViews: 142 
+        });
+        setSpaces(spacesData);
+      } catch (e) { 
+        console.error('Owner dashboard fetch failed:', e);
+        setSpaces([]); // Fallback to empty
+      } finally { 
+        setLoading(false); 
+      }
     };
     load();
   }, [profile]);

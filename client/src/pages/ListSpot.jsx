@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, MapPin, IndianRupee, Clock, Image as ImageIcon, Save, Trash2, 
   CheckCircle2, Loader2, Globe, CloudUpload, X, Home, Building2, Store, TreePine, 
-  Car, Bike, Shield, Eye, TrendingUp, Sparkles, Send
+  Car, Bike, Shield, Eye, TrendingUp, Sparkles, Send, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiService from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useGoogleDrive } from '../hooks/useGoogleDrive';
-import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
 const STEPS = ['Location', 'Basics', 'Photos', 'Pricing', 'Review'];

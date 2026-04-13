@@ -9,14 +9,11 @@ const ManageSlots = () => {
     const navigate = useNavigate();
     
     const [space, setSpace] = useState(null);
-    const [bookings, setBookings] = useState([]);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-    const [loading, setLoading] = useState(true);
     const [slots, setSlots] = useState({ available: [], booked: [], surge: [] });
 
     useEffect(() => {
         const fetch = async () => {
-            setLoading(true);
             try {
                 const [spaceRes, slotsRes] = await Promise.all([
                    apiService.getSpot(id),

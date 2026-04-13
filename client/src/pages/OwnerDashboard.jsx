@@ -19,7 +19,7 @@ const OwnerDashboard = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [statsRes, spacesRes] = await Promise.all([
+        const [, spacesRes] = await Promise.all([
           apiService.getRecommendation(profile?.location?.city || 'Hyderabad', profile?.location?.area || 'Banjara Hills'), // Mock stats logic
           apiService.getOwnerSpaces()
         ]);

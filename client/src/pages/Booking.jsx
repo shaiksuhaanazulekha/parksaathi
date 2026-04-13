@@ -8,7 +8,6 @@ import { useAuth } from '../hooks/useAuth';
 const Booking = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { profile } = useAuth();
     
     const [spot, setSpot] = useState(null);
     const [slots, setSlots] = useState({ available: [], booked: [], surge: [] });
@@ -22,8 +21,6 @@ const Booking = () => {
     const [duration, setDuration] = useState(1);
     const [coupon, setCoupon] = useState('');
     const [couponApplied, setCouponApplied] = useState(null); // { code, discount }
-    
-    const scrollRef = useRef(null);
 
     useEffect(() => {
         const fetch = async () => {
@@ -57,7 +54,6 @@ const Booking = () => {
         if (!startTime) return;
         setSubmitting(true);
         try {
-            const pricing = calculatePricing();
             const res = await apiService.createBooking({
                 spaceId: id,
                 date: selectedDate,

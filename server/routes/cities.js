@@ -25,13 +25,25 @@ router.get('/:name/areas', async (req, res) => {
     }
 });
 
-// GET /api/cities/pricing/:city/:area
-router.get('/pricing/:city/:area', async (req, res) => {
+// GET /api/pricing/:city/:area
+router.get('/:city/:area', async (req, res) => {
     try {
         const city = await City.findOne({ name: req.params.city }).lean();
         const area = city?.areas.find(a => a.name === req.params.area);
         if (!area) return res.status(404).json({ error: 'Area not found' });
         res.json(area);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/recommend
+router.get('/', async (req, res) => {
+    try {
+        const { city: cityName, area: areaName } = req.query;
+        const city = await City.findOne({ name: cityName }).lean();
+        const area = city?.areas.find(a => a.name === areaName);
+        res.json(area || { avg: 40, min: 20, max: 80, demand: 'High' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

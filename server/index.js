@@ -63,6 +63,7 @@ app.use('/api/health', healthRoutes);
 
 // Compatibility Aliases
 app.use('/api/spots', spaceRoutes); 
+app.use('/api/recommend', citiesRoutes);
 app.use('/api/pricing', citiesRoutes);
 
 // DB Connection

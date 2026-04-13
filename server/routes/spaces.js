@@ -21,6 +21,17 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/spaces/owner
+router.get('/owner', auth, owner, async (req, res) => {
+    try {
+        const ownerId = req.user.uid || req.user.id;
+        const spaces = await ParkingSpace.find({ ownerId }).lean();
+        res.json(spaces);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/spaces/:id
 router.get('/:id', async (req, res) => {
     try {

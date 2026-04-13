@@ -11,4 +11,4 @@ Your code is on GitHub. To make it a live website like `https://parksaathi.verce
     *   Add `VITE_GOOGLE_MAPS_API_KEY` if you have one (optional, since we switched to Leaflet).
 5.  **Click Deploy**: Wait ~1 minute.
 
-🎉 **Success!** You will get a live URL (e.g., `parksaathi.vercel.app`).
+🎉 **Success!** You will get a live URL: `https://parksaathi.vercel.app`.

@@ -24,7 +24,9 @@ const ProtectedRoute = ({ children, role }) => {
     const { user, profile, loading } = useAuth();
     if (loading) return null;
     if (!user) return <Navigate to="/login" replace />;
-    if (role && profile?.role !== role) return <Navigate to="/dashboard" replace />;
+    if (role && (profile?.role || '').toLowerCase() !== role.toLowerCase()) {
+        return <Navigate to="/dashboard" replace />;
+    }
     return children;
 };
 

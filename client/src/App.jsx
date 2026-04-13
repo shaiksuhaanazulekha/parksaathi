@@ -9,7 +9,7 @@ import Home from './pages/Home';
 import LocationPicker from './pages/LocationPicker';
 import AreaPicker from './pages/AreaPicker';
 import Booking from './pages/Booking';
-import ListSpot from './pages/ListSpot';
+import ListSpot from './pages/ListSpotWizard';
 import Profile from './pages/Profile';
 import MyBookings from './pages/MyBookings';
 import OwnerDashboard from './pages/OwnerDashboard';

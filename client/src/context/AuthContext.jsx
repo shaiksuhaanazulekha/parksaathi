@@ -97,8 +97,8 @@ export const AuthProvider = ({ children }) => {
 
         if (!isDemo) {
             try {
-                const { data } = await apiService.updateProfile(id, updates);
-                setProfile(data.profile);
+                const { data } = await apiService.updateProfile(updates);
+                setProfile(data); // data is the updated user object
             } catch (err) {
                 console.error('Profile update failed:', err.message);
             }

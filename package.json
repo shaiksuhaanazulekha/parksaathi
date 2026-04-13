@@ -1,6 +1,10 @@
 {
   "name": "parksaathi-monorepo",
   "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run server --prefix server\" \"npm run dev --prefix client\"",
     "server": "npm run dev --prefix server",

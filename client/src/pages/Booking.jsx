@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Calendar, Clock, MapPin, IndianRupee, Zap, ShieldCheck, CheckCircle2, Navigation, Share2, Tag, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiService from '../services/api';
-import { useAuth } from '../hooks/useAuth';
 
 const Booking = () => {
     const { id } = useParams();

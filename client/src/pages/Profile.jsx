@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { User, Phone, Mail, LogOut, ChevronRight, ShieldCheck, LayoutDashboard, RefreshCw, Bell, Camera, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import apiService from '../services/api';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 

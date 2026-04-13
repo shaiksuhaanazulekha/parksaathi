@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, MapPin, IndianRupee, Clock, Image as ImageIcon, Save, Trash2, 
@@ -17,12 +17,12 @@ const STEPS = ['Location', 'Basics', 'Photos', 'Pricing', 'Review'];
 
 const ListSpot = () => {
     const navigate = useNavigate();
-    const { profile } = useAuth();
+    useAuth();
     
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
-    const [error, setError] = useState('');
+    const [, setError] = useState('');
 
     // Form Data
     const [form, setForm] = useState({

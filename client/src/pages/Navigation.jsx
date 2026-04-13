@@ -18,7 +18,6 @@ const NavigationPage = () => {
     const navigate = useNavigate();
     const [booking, setBooking] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError]     = useState('');
 
     useEffect(() => {
         const fetch = async () => {

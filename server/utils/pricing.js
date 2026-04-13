@@ -1,8 +1,7 @@
-import Database from '@replit/database';
-const replitDB = new Database();
+import * as kvStore from '../services/kvStore.js';
 
 const SURGE_CACHE_KEY = 'surge:current';
-const SURGE_CACHE_TTL = 5 * 60 * 1000;
+const SURGE_CACHE_TTL = 300; // 5 minutes in seconds
 
 function calculateSurge(now = new Date()) {
   const hour = now.getHours();
@@ -19,8 +18,7 @@ function calculateSurge(now = new Date()) {
         ? 'Morning peak 8-10 AM'
         : 'Evening peak 5-8 PM',
       type: 'peak',
-      until: isMorningPeak ? '10:00 AM' : '8:00 PM',
-      cachedAt: Date.now()
+      until: isMorningPeak ? '10:00 AM' : '8:00 PM'
     };
   }
 
@@ -30,8 +28,7 @@ function calculateSurge(now = new Date()) {
       multiplier: 1.2,
       reason: 'Weekend pricing',
       type: 'weekend',
-      until: 'Monday 12:00 AM',
-      cachedAt: Date.now()
+      until: 'Monday 12:00 AM'
     };
   }
 
@@ -40,29 +37,25 @@ function calculateSurge(now = new Date()) {
     multiplier: 1.0,
     reason: 'Standard pricing',
     type: 'standard',
-    until: null,
-    cachedAt: Date.now()
+    until: null
   };
 }
 
 export async function getSurgePricing() {
   try {
-    const cached = await replitDB.get(SURGE_CACHE_KEY);
+    const cached = await kvStore.get(SURGE_CACHE_KEY);
 
     if (cached) {
-      const age = Date.now() - cached.cachedAt;
-      if (age < SURGE_CACHE_TTL) {
         return { ...cached, fromCache: true };
-      }
     }
 
     const fresh = calculateSurge();
-    await replitDB.set(SURGE_CACHE_KEY, fresh);
+    await kvStore.set(SURGE_CACHE_KEY, fresh, SURGE_CACHE_TTL);
     console.log('Surge cache refreshed:', fresh.type);
     return { ...fresh, fromCache: false };
 
   } catch (err) {
-    console.error('Surge cache error, using live calc:', err);
+    console.error('Surge store error, using live calc:', err);
     return { ...calculateSurge(), fromCache: false };
   }
 }

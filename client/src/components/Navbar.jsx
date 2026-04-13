@@ -17,8 +17,9 @@ const Navbar = () => {
             if (!profile?.id) return;
             try {
                 const { data } = await apiService.getNotifications();
-                setUnread(data.filter(n => !n.isRead).length);
-            } catch { /* silent */ }
+                const resData = Array.isArray(data) ? data : [];
+                setUnread(resData.filter(n => !n.isRead).length);
+            } catch (err) { console.error('Navbar notif error:', err); }
         };
         fetchUnread();
         const interval = setInterval(fetchUnread, 30000);

@@ -14,8 +14,9 @@ const parkingSchema = new mongoose.Schema({
         lng: { type: Number, required: true }
     },
     photos: [{ 
-        driveId: String, 
-        url: String 
+        filename: String, 
+        url: String,
+        size: Number
     }],
     amenities: {
         covered: { type: Boolean, default: false },
@@ -51,6 +52,16 @@ const parkingSchema = new mongoose.Schema({
         endTime:   String,
         reason:    String
     }]
-}, { timestamps: true });
+}, { 
+    timestamps: true,
+    toJSON: {
+        transform: (doc, ret) => {
+            ret.id = ret._id;
+            delete ret._id;
+            delete ret.__v;
+            return ret;
+        }
+    }
+});
 
 module.exports = mongoose.model('ParkingSpace', parkingSchema);

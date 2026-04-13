@@ -31,6 +31,7 @@ const apiService = {
   createSpot:   (data) => api.post('/spaces', data),
   getSlots:     (id, date) => api.get(`/spaces/${id}/slots`, { params: { date } }),
   getOwnerSpaces: () => api.get('/spaces/owner'),
+  deletePhoto: (filename) => api.delete(`/upload/photo/${filename}`),
 
   // Pricing Intel
   getRecommendation: (city, area) => api.get('/pricing/recommend', { params: { city, area } }),

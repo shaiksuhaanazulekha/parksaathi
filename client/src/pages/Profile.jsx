@@ -49,16 +49,45 @@ const Profile = () => {
         const canvas = document.createElement('canvas');
         const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
         const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
-        canvas.width = completedCrop.width;
-        canvas.height = completedCrop.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(imgRef.current, completedCrop.x * scaleX, completedCrop.y * scaleY, completedCrop.width * scaleX, completedCrop.height * scaleY, 0, 0, completedCrop.width, completedCrop.height);
         
-        const base64 = canvas.toDataURL('image/jpeg');
+        // Use a fixed size for profile photos
+        canvas.width = 400;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        
+        // Create circular path for clipping
+        ctx.beginPath();
+        ctx.arc(200, 200, 200, 0, Math.PI * 2);
+        ctx.clip();
+
+        ctx.drawImage(
+            imgRef.current, 
+            completedCrop.x * scaleX, completedCrop.y * scaleY, 
+            completedCrop.width * scaleX, completedCrop.height * scaleY, 
+            0, 0, 400, 400
+        );
+        
         setLoading(true);
         try {
-            await updateProfile({ profilePhoto: base64 });
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9));
+            const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+            
+            const formData = new FormData();
+            formData.append('photo', file);
+
+            // POST to upload
+            const { data: uploadRes } = await apiService.uploadPhoto(formData);
+            
+            // Update profile with the URL
+            await updateProfile({ 
+                profilePhoto: uploadRes.url,
+                "profilePhoto.url": uploadRes.url, 
+                "profilePhoto.filename": uploadRes.filename 
+            });
+            
             setCropModal(null);
+        } catch (err) {
+            console.error('Avatar update failed:', err);
         } finally { setLoading(false); }
     };
 

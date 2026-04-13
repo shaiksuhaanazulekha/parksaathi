@@ -64,12 +64,16 @@ const AppRoutes = () => {
     );
 };
 
+import { SocketProvider } from './context/SocketContext';
+
 export default function App() {
     return (
         <AuthProvider>
-            <Router>
-                <AppRoutes />
-            </Router>
+            <SocketProvider>
+                <Router>
+                    <AppRoutes />
+                </Router>
+            </SocketProvider>
         </AuthProvider>
     );
 }

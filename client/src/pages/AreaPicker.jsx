@@ -30,9 +30,9 @@ const AreaPicker = () => {
   const filtered = areas.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
 
   const getPill = (zone) => {
-    if (zone === 'budget') return <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full">🟢 Bud</span>;
-    if (zone === 'standard') return <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full">🔵 Std</span>;
-    return <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-orange-100 text-orange-600 rounded-full">🟠 Pre</span>;
+    if (zone === 'budget') return <span className="text-[8px] font-black uppercase tracking-[1px] px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">Budget</span>;
+    if (zone === 'standard') return <span className="text-[8px] font-black uppercase tracking-[1px] px-2.5 py-1 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">Standard</span>;
+    return <span className="text-[8px] font-black uppercase tracking-[1px] px-2.5 py-1 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">Premium</span>;
   };
 
   return (

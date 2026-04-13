@@ -12,12 +12,13 @@ import { useGoogleDrive } from '../hooks/useGoogleDrive';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
+import DirectUploader from '../components/DirectUploader';
+
 const STEPS = ['Location', 'Basics', 'Photos', 'Pricing', 'Review'];
 
 const ListSpot = () => {
     const navigate = useNavigate();
     const { profile } = useAuth();
-    const { openPicker } = useGoogleDrive();
     
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -52,14 +53,14 @@ const ListSpot = () => {
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            const res = await apiService.createSpot({
+            await apiService.createSpot({
                 ...form,
-                photos: photos.map(p => ({ url: p.url, driveId: p.driveId })),
+                photos: photos.map(p => ({ url: p.url, filename: p.filename, size: p.size })),
                 coordinates: { lat: form.lat, lng: form.lng },
                 pricing: { basePrice: form.basePrice, peakPricingEnabled: form.peakPricingEnabled },
                 availability: { days: form.days, startTime: form.startTime, endTime: form.endTime }
             });
-            setSuccess(res.data);
+            setSuccess(true);
             setTimeout(() => navigate('/dashboard'), 2000);
         } catch (err) { setError(err.message); }
         finally { setLoading(false); }
@@ -87,7 +88,11 @@ const ListSpot = () => {
                 <AnimatePresence mode="wait">
                     {step === 0 && <StepLocation key={0} form={form} set={set} />}
                     {step === 1 && <StepDetails key={1} form={form} set={set} />}
-                    {step === 2 && <StepPhotos key={2} photos={photos} setPhotos={setPhotos} openPicker={openPicker} />}
+                    {step === 2 && (
+                        <motion.section key={2} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                            <DirectUploader photos={photos} setPhotos={setPhotos} />
+                        </motion.section>
+                    )}
                     {step === 3 && <StepPricing key={3} form={form} set={set} intel={pricingIntel} />}
                     {step === 4 && <StepReview key={4} form={form} photos={photos} />}
                 </AnimatePresence>
@@ -237,43 +242,6 @@ const StepDetails = ({ form, set }) => (
                 ))}
             </div>
         </div>
-    </motion.section>
-);
-
-const StepPhotos = ({ photos, setPhotos, openPicker }) => (
-    <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
-        <div className="flex flex-col gap-3">
-            <button 
-                onClick={() => openPicker((docs) => setPhotos(prev => [...prev, ...docs.map(doc => ({ url: doc.url || `https://lh3.googleusercontent.com/d/${doc.id}`, driveId: doc.id }))]))}
-                className="w-full py-10 border-4 border-dashed border-blue-100 rounded-[40px] bg-blue-50 flex flex-col items-center justify-center gap-3 group hover:bg-blue-100 transition-all"
-            >
-                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"><Globe size={32} className="text-blue-500" /></div>
-                <div className="text-center">
-                    <p className="font-black text-blue-600 uppercase tracking-widest">Choose from Drive</p>
-                    <p className="text-[10px] text-blue-400 font-bold">Import photos from your Google account</p>
-                </div>
-            </button>
-            <label className="w-full py-8 border-4 border-dashed border-emerald-100 rounded-[40px] bg-emerald-50 flex flex-col items-center justify-center gap-2 group hover:bg-emerald-100 transition-all cursor-pointer">
-                <CloudUpload size={24} className="text-emerald-500" />
-                <span className="font-black text-emerald-600 uppercase tracking-widest text-[10px]">Upload from Device</span>
-                <input type="file" multiple className="hidden" />
-            </label>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-            {photos.map((p, i) => (
-                <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 group">
-                    <img src={p.url} className="w-full h-full object-cover" />
-                    <button onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X size={14} />
-                    </button>
-                    {i === 0 && <span className="absolute bottom-1 left-1 bg-park-primary text-white text-[8px] font-black px-1.5 py-0.5 rounded-lg">COVER</span>}
-                </div>
-            ))}
-        </div>
-        {photos.length < 2 && (
-             <p className="text-center text-[11px] text-orange-500 font-black uppercase tracking-widest">⚠️ Minimum 2 photos required to publish</p>
-        )}
     </motion.section>
 );
 

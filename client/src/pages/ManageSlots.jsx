@@ -22,7 +22,6 @@ const ManageSlots = () => {
                 setSpace(spaceRes.data);
                 setSlots(slotsRes.data);
             } catch (e) { console.error(e); }
-            finally { setLoading(false); }
         };
         fetch();
     }, [id, selectedDate]);

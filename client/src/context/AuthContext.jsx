@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
             const token = localStorage.getItem('auth_token');
             if (token) {
                 try {
-                    const { data } = await apiService.getProfile();
+                    const { data } = await apiService.getMe();
                     const p = data.profile;
                     setUser({ uid: p.id, email: p.email });
                     setProfile(p);
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }) => {
         if (demo) return;
 
         try {
-            const { data } = await apiService.getProfile();
+            const { data } = await apiService.getMe();
             setProfile(data.profile);
         } catch { /* silent */ }
     }, []);
